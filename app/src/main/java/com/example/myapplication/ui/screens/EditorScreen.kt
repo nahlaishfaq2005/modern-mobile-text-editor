@@ -8,6 +8,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.myapplication.ui.theme.MyApplicationTheme
+
+@Preview(showBackground = true)
+@Composable
+fun EditorScreenPreview() {
+    MyApplicationTheme {
+        EditorScreen()
+    }
+}
+
 @Composable
 fun EditorScreen(fileName: String = "Untitled", fileType: String = "Kotlin") {
     Box(

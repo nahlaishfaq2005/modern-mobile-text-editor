@@ -25,6 +25,22 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.data.RecentFile
 import com.example.myapplication.ui.viewmodel.HomeViewModel
 
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.myapplication.ui.theme.MyApplicationTheme
+
+@Preview(showBackground = true)
+@Composable
+fun HomeScreenPreview() {
+    MyApplicationTheme {
+        HomeScreen(
+            onNavigateToEditor = { _, _ -> },
+            onNavigateToRecentAll = { },
+            onNavigateToVersions = { },
+            onNavigateToSettings = { }
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -46,50 +62,19 @@ fun HomeScreen(
         }
     }
 
-    var showSheet by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
+    var showNewFileDialog by remember { mutableStateOf(false) }
+    var dialogInitialType by remember { mutableStateOf(FileType.Kotlin) }
 
-    if (showSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showSheet = false },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .padding(bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Create New File",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                QuickActionCard(
-                    title = "New Kotlin File",
-                    icon = Icons.Default.Code,
-                    iconText = "K",
-                    onClick = {
-                        showSheet = false
-                        viewModel.addRecentFile("Untitled.kt", "Kotlin", "")
-                        onNavigateToEditor("Untitled.kt", "Kotlin")
-                    }
-                )
-                QuickActionCard(
-                    title = "New Markdown File",
-                    icon = Icons.Default.Description,
-                    iconText = "M",
-                    onClick = {
-                        showSheet = false
-                        viewModel.addRecentFile("Untitled.md", "Markdown", "")
-                        onNavigateToEditor("Untitled.md", "Markdown")
-                    }
-                )
+    if (showNewFileDialog) {
+        NewFileDialog(
+            initialType = dialogInitialType,
+            onDismiss = { showNewFileDialog = false },
+            onCreate = { name, type ->
+                showNewFileDialog = false
+                viewModel.addRecentFile(name, type, "")
+                onNavigateToEditor(name, type)
             }
-        }
+        )
     }
 
     Scaffold(
@@ -104,7 +89,10 @@ fun HomeScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showSheet = true },
+                onClick = { 
+                    dialogInitialType = FileType.Kotlin
+                    showNewFileDialog = true 
+                },
                 containerColor = MaterialTheme.colorScheme.secondary,
                 contentColor = Color.White,
                 shape = RoundedCornerShape(16.dp),
@@ -137,14 +125,14 @@ fun HomeScreen(
             item {
                 QuickActionsGrid(
                     onNewKotlin = { 
-                        viewModel.addRecentFile("Untitled.kt", "Kotlin", "")
-                        onNavigateToEditor("Untitled.kt", "Kotlin") 
+                        dialogInitialType = FileType.Kotlin
+                        showNewFileDialog = true
                     },
                     onNewMarkdown = { 
-                        viewModel.addRecentFile("Untitled.md", "Markdown", "")
-                        onNavigateToEditor("Untitled.md", "Markdown") 
+                        dialogInitialType = FileType.Markdown
+                        showNewFileDialog = true
                     },
-                    onOpenFile = { filePickerLauncher.launch(arrayOf("*/*")) },
+                    onOpenFile = { filePickerLauncher.launch(arrayOf("*/*")) },//show all files
                     onImportFile = { filePickerLauncher.launch(arrayOf("*/*")) }
                 )
                 Spacer(modifier = Modifier.height(32.dp))

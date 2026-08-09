@@ -29,6 +29,17 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.myapplication.ui.theme.MyApplicationTheme
+
+@Preview(showBackground = true)
+@Composable
+fun SplashScreenPreview() {
+    MyApplicationTheme {
+        SplashScreen(onNavigateToHome = {})
+    }
+}
+
 @Composable
 fun SplashScreen(onNavigateToHome: () -> Unit) {
     val scale = remember { Animatable(0.8f) }

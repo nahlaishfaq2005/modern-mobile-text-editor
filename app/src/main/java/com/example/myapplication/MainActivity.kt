@@ -58,7 +58,14 @@ class MainActivity : ComponentActivity() {
                     ) { backStackEntry ->
                         val name = backStackEntry.arguments?.getString("name") ?: "Untitled"
                         val type = backStackEntry.arguments?.getString("type") ?: "Kotlin"
-                        EditorScreen(name, type)
+                        EditorScreen(
+                            fileName = name,
+                            fileType = type,
+                            onNavigateBack = { navController.popBackStack() },
+                            onNavigateToRecentAll = { navController.navigate("recent_all") },
+                            onNavigateToVersions = { navController.navigate("versions") },
+                            onNavigateToSettings = { navController.navigate("settings") }
+                        )
                     }
                     composable("recent_all") {
                         RecentFilesScreen()

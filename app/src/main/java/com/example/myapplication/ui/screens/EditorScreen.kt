@@ -96,21 +96,17 @@ fun EditorScreen(
                     EditorTopBar(
                         fileName = fileName,
                         fileType = fileType,
-                        onBackClick = onNavigateBack,
-                        onSearchClick = { viewModel.toggleSearchReplace() },
-                        onGridClick = { scope.launch { drawerState.open() } }
-                    )
-                    EditorToolbar(
-                        fileType = fileType,
-                        isPreviewMode = isPreviewMode,
-                        onPreviewToggle = { isPreviewMode = !isPreviewMode },
-                        onUndo = { viewModel.undo() },
-                        onRedo = { viewModel.redo() },
-                        onWordWrapToggle = { viewModel.toggleWordWrap() },
-                        onSearchClick = { viewModel.toggleSearchReplace() },
-                        isWordWrapEnabled = isWordWrapEnabled,
+                        onMenuClick = { scope.launch { drawerState.open() } },
                         showMoreMenu = showMoreMenu,
                         onMoreMenuToggle = { showMoreMenu = it }
+                    )
+                    EditorToolbar(
+                        onUndo = { viewModel.undo() },
+                        onRedo = { viewModel.redo() },
+                        onFormatClick = { /* Format logic */ },
+                        onSearchClick = { viewModel.toggleSearchReplace() },
+                        onReplaceClick = { viewModel.toggleSearchReplace() },
+                        onSaveClick = { /* Save logic */ }
                     )
                 }
             },
@@ -184,9 +180,9 @@ fun EditorScreen(
 fun EditorTopBar(
     fileName: String,
     fileType: String,
-    onBackClick: () -> Unit,
-    onSearchClick: () -> Unit,
-    onGridClick: () -> Unit
+    onMenuClick: () -> Unit,
+    showMoreMenu: Boolean,
+    onMoreMenuToggle: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -201,10 +197,10 @@ fun EditorTopBar(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBackClick) {
+                IconButton(onClick = onMenuClick) {
                     Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        Icons.Default.Menu,
+                        contentDescription = "Menu",
                         tint = Color.White,
                         modifier = Modifier.size(28.dp)
                     )
@@ -266,66 +262,14 @@ fun EditorTopBar(
                     )
                 }
             }
-            Row {
-                IconButton(onClick = onSearchClick) {
-                    Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White, modifier = Modifier.size(26.dp))
-                }
-                IconButton(onClick = onGridClick) {
-                    Icon(Icons.Default.GridView, contentDescription = "Files", tint = Color.White, modifier = Modifier.size(26.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun EditorToolbar(
-    fileType: String,
-    isPreviewMode: Boolean,
-    onPreviewToggle: () -> Unit,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onWordWrapToggle: () -> Unit,
-    onSearchClick: () -> Unit,
-    isWordWrapEnabled: Boolean,
-    showMoreMenu: Boolean,
-    onMoreMenuToggle: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row {
-            IconButton(onClick = onUndo) {
-                Icon(Icons.Default.Undo, contentDescription = "Undo", tint = Color.LightGray)
-            }
-            IconButton(onClick = onRedo) {
-                Icon(Icons.Default.Redo, contentDescription = "Redo", tint = Color.LightGray)
-            }
-            IconButton(onClick = onSearchClick) {
-                Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.LightGray)
-            }
-        }
-        Row {
-            IconButton(onClick = onPreviewToggle) {
-                Icon(Icons.Default.CropFree, contentDescription = "Toggle", tint = Color.LightGray)
-            }
-            IconButton(onClick = onWordWrapToggle) {
-                Icon(
-                    Icons.Default.WrapText,
-                    contentDescription = "Word Wrap",
-                    tint = if (isWordWrapEnabled) MaterialTheme.colorScheme.primary else Color.LightGray
-                )
-            }
-            IconButton(onClick = { /* Save */ }) {
-                Icon(Icons.Default.Save, contentDescription = "Save", tint = Color.LightGray)
-            }
             Box {
                 IconButton(onClick = { onMoreMenuToggle(true) }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.LightGray)
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "More",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
                 }
                 DropdownMenu(
                     expanded = showMoreMenu,
@@ -351,6 +295,56 @@ fun EditorToolbar(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun EditorToolbar(
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onFormatClick: () -> Unit,
+    onSearchClick: () -> Unit,
+    onReplaceClick: () -> Unit,
+    onSaveClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onUndo) {
+            Icon(Icons.Default.Undo, contentDescription = "Undo", tint = Color.LightGray)
+        }
+        IconButton(onClick = onRedo) {
+            Icon(Icons.Default.Redo, contentDescription = "Redo", tint = Color.LightGray)
+        }
+        
+        Spacer(modifier = Modifier.width(24.dp))
+        
+        IconButton(onClick = onFormatClick) {
+            Icon(Icons.Default.PlaylistAdd, contentDescription = "Format", tint = Color.LightGray)
+        }
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        IconButton(onClick = onSearchClick) {
+            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.LightGray)
+        }
+        IconButton(onClick = onReplaceClick) {
+            Icon(Icons.Default.FindReplace, contentDescription = "Replace", tint = Color.LightGray)
+        }
+        
+        Spacer(modifier = Modifier.width(8.dp))
+        VerticalDivider(
+            modifier = Modifier.height(24.dp),
+            color = Color.LightGray.copy(alpha = 0.3f)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        
+        IconButton(onClick = onSaveClick) {
+            Icon(Icons.Default.Save, contentDescription = "Save", tint = Color.LightGray)
         }
     }
 }

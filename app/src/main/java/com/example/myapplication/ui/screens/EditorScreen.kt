@@ -125,7 +125,7 @@ fun EditorScreen(
                     HomeBottomNavigation(
                         currentRoute = "editor",
                         onHomeClick = onNavigateBack,
-                        onRecentClick = onNavigateToRecentAll,
+                        onEditorClick = { /* Already in editor */ },
                         onVersionsClick = onNavigateToVersions,
                         onSettingsClick = onNavigateToSettings
                     )
@@ -211,27 +211,41 @@ fun EditorTopBar(
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 
-                // Nice Icon Box
+                // Nice Icon Box (matching Home Screen style)
                 Box(
                     modifier = Modifier
                         .size(36.dp)
                         .background(
-                            if (fileType == "Kotlin") Color(0xFF8B5CF6).copy(alpha = 0.2f)
-                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                            RoundedCornerShape(10.dp)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            RoundedCornerShape(8.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = when (fileType) {
-                            "Kotlin" -> Icons.Default.Code
-                            "Markdown" -> Icons.Default.Description
-                            else -> Icons.AutoMirrored.Filled.Notes
-                        },
-                        contentDescription = null,
-                        tint = if (fileType == "Kotlin") Color(0xFF8B5CF6) else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    val iconText = when (fileType) {
+                        "Kotlin" -> "K"
+                        "Markdown" -> "M"
+                        "Plain Text" -> "T"
+                        else -> null
+                    }
+                    
+                    if (iconText != null) {
+                        Text(
+                            text = iconText,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = when (fileType) {
+                                "Markdown" -> Icons.Default.Description
+                                else -> Icons.AutoMirrored.Filled.Notes
+                            },
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.width(12.dp))

@@ -82,7 +82,7 @@ fun HomeScreen(
             HomeBottomNavigation(
                 currentRoute = "home",
                 onHomeClick = { },
-                onRecentClick = onNavigateToRecentAll,
+                onEditorClick = onNavigateToRecentAll,
                 onVersionsClick = onNavigateToVersions,
                 onSettingsClick = onNavigateToSettings
             )
@@ -414,7 +414,7 @@ fun RecentFileCard(file: RecentFile, onClick: () -> Unit) {
 fun HomeBottomNavigation(
     currentRoute: String,
     onHomeClick: () -> Unit,
-    onRecentClick: () -> Unit,
+    onEditorClick: () -> Unit,
     onVersionsClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
@@ -436,12 +436,15 @@ fun HomeBottomNavigation(
             )
         )
         NavigationBarItem(
-            selected = currentRoute == "recent",
-            onClick = onRecentClick,
-            icon = { Icon(Icons.Default.History, contentDescription = "Recent") },
-            label = { Text("Recent") },
+            selected = currentRoute == "editor",
+            onClick = onEditorClick,
+            icon = { Icon(Icons.Default.EditNote, contentDescription = "Editor") },
+            label = { Text("Editor") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MaterialTheme.colorScheme.secondary,
+                selectedTextColor = MaterialTheme.colorScheme.secondary,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 indicatorColor = Color.Transparent
             )
         )
@@ -452,6 +455,9 @@ fun HomeBottomNavigation(
             label = { Text("Versions") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MaterialTheme.colorScheme.secondary,
+                selectedTextColor = MaterialTheme.colorScheme.secondary,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 indicatorColor = Color.Transparent
             )
         )
@@ -462,6 +468,9 @@ fun HomeBottomNavigation(
             label = { Text("Settings") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MaterialTheme.colorScheme.secondary,
+                selectedTextColor = MaterialTheme.colorScheme.secondary,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 indicatorColor = Color.Transparent
             )
         )

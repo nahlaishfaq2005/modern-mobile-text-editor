@@ -45,30 +45,40 @@ fun EditorScreen(
     val content by viewModel.content
     val isWordWrapEnabled by viewModel.isWordWrapEnabled.collectAsState()
     val showSearchReplace by viewModel.showSearchReplace.collectAsState()
+    val isReplaceMode by viewModel.isReplaceMode.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val replaceQuery by viewModel.replaceQuery.collectAsState()
+    val saveStatus by viewModel.saveStatus.collectAsState()
     val recentFiles by homeViewModel.recentFiles.collectAsState()
+    
+    LaunchedEffect(fileName) {
+        viewModel.loadFile(fileName)
+    }
     
     var isPreviewMode by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true
+    )
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
     if (showSearchReplace) {
         ModalBottomSheet(
-            onDismissRequest = { viewModel.toggleSearchReplace() },
+            onDismissRequest = { viewModel.toggleSearchReplace(isReplaceMode) },
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
             SearchReplaceSheet(
+                isReplaceMode = isReplaceMode,
                 searchQuery = searchQuery,
                 onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
                 replaceQuery = replaceQuery,
                 onReplaceQueryChange = { viewModel.onReplaceQueryChange(it) },
                 onReplaceNext = { viewModel.replaceNext() },
                 onReplaceAll = { viewModel.replaceAll() },
-                onDismiss = { viewModel.toggleSearchReplace() }
+                onDismiss = { viewModel.toggleSearchReplace(isReplaceMode) }
             )
         }
     }
@@ -98,15 +108,16 @@ fun EditorScreen(
                         fileType = fileType,
                         onMenuClick = { scope.launch { drawerState.open() } },
                         showMoreMenu = showMoreMenu,
-                        onMoreMenuToggle = { showMoreMenu = it }
+                        onMoreMenuToggle = { showMoreMenu = it },
+                        onSaveClick = { viewModel.saveFile(fileName) }
                     )
                     EditorToolbar(
                         onUndo = { viewModel.undo() },
                         onRedo = { viewModel.redo() },
                         onFormatClick = { /* Format logic */ },
-                        onSearchClick = { viewModel.toggleSearchReplace() },
-                        onReplaceClick = { viewModel.toggleSearchReplace() },
-                        onSaveClick = { /* Save logic */ }
+                        onSearchClick = { viewModel.toggleSearchReplace(false) },
+                        onReplaceClick = { viewModel.toggleSearchReplace(true) },
+                        onSaveClick = { viewModel.saveFile(fileName) }
                     )
                 }
             },
@@ -116,7 +127,7 @@ fun EditorScreen(
                         line = 11,
                         col = 25,
                         fileType = fileType,
-                        saveStatus = "Autosaved"
+                        saveStatus = saveStatus
                     )
                     HomeBottomNavigation(
                         currentRoute = "editor",
@@ -182,7 +193,8 @@ fun EditorTopBar(
     fileType: String,
     onMenuClick: () -> Unit,
     showMoreMenu: Boolean,
-    onMoreMenuToggle: (Boolean) -> Unit
+    onMoreMenuToggle: (Boolean) -> Unit,
+    onSaveClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -277,6 +289,14 @@ fun EditorTopBar(
                     modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                 ) {
                     DropdownMenuItem(
+                        text = { Text("Save") },
+                        onClick = { 
+                            onSaveClick()
+                            onMoreMenuToggle(false) 
+                        },
+                        leadingIcon = { Icon(Icons.Default.Save, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
                         text = { Text("Save As") },
                         onClick = { onMoreMenuToggle(false) },
                         leadingIcon = { Icon(Icons.Default.SaveAs, contentDescription = null) }
@@ -333,7 +353,7 @@ fun EditorToolbar(
             Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.LightGray)
         }
         IconButton(onClick = onReplaceClick) {
-            Icon(Icons.Default.FindReplace, contentDescription = "Replace", tint = Color.LightGray)
+            Icon(Icons.Default.SwapHoriz, contentDescription = "Replace", tint = Color.LightGray)
         }
         
         Spacer(modifier = Modifier.width(8.dp))

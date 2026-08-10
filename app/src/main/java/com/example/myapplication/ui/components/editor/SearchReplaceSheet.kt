@@ -181,8 +181,8 @@ fun SearchField(value: String, onValueChange: (String) -> Unit, placeholder: Str
             }
         },
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color(0xFF1E222D),
-            unfocusedContainerColor = Color(0xFF1E222D),
+            focusedContainerColor = Color(0xFF2D323E),
+            unfocusedContainerColor = Color(0xFF2D323E),
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
             focusedTextColor = Color.White,

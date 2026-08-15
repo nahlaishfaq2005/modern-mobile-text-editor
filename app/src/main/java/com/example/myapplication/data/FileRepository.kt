@@ -29,4 +29,38 @@ class FileRepository(private val context: Context) {
             ""
         }
     }
+
+    /**
+     * Saves an immutable base snapshot of a file.
+     * This is only done once when Version 1 is created.
+     */
+    fun saveBaseSnapshot(fileId: Long, content: String): Boolean {
+        return try {
+            val baseDir = File(context.filesDir, "version_bases")
+            if (!baseDir.exists()) baseDir.mkdirs()
+            
+            val baseFile = File(baseDir, "${fileId}_base.txt")
+            if (baseFile.exists()) return true // Already exists, do not overwrite
+            
+            baseFile.writeText(content)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Loads the immutable base snapshot for a file.
+     */
+    fun loadBaseSnapshot(fileId: Long): String? {
+        return try {
+            val baseFile = File(context.filesDir, "version_bases/${fileId}_base.txt")
+            if (!baseFile.exists()) return null
+            baseFile.readText()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 }

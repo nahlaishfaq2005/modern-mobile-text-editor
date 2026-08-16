@@ -98,25 +98,63 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun replaceAll() {
-        val newText = _content.value.text.replace(_searchQuery.value, _replaceQuery.value)
-        onContentChange(_content.value.copy(text = newText))
+        val query = _searchQuery.value
+        val replace = _replaceQuery.value
+        if (query.isEmpty()) return
+
+        try {
+            // Use word boundaries \b to ensure only whole words are replaced
+            val regex = Regex("\\b${Regex.escape(query)}\\b")
+            val newText = _content.value.text.replace(regex, replace)
+            onContentChange(_content.value.copy(text = newText))
+        } catch (e: Exception) {
+            // Fallback to simple replace if regex fails for some reason
+            val newText = _content.value.text.replace(query, replace)
+            onContentChange(_content.value.copy(text = newText))
+        }
     }
-    
+
     fun replaceNext() {
         val text = _content.value.text
         val query = _searchQuery.value
         val replace = _replaceQuery.value
         if (query.isEmpty()) return
-        
-        val index = text.indexOf(query, _content.value.selection.end)
-        if (index != -1) {
-            val newText = text.replaceRange(index, index + query.length, replace)
-            onContentChange(_content.value.copy(text = newText))
-        } else {
-            val wrapIndex = text.indexOf(query, 0)
-            if (wrapIndex != -1) {
-                val newText = text.replaceRange(wrapIndex, wrapIndex + query.length, replace)
-                onContentChange(_content.value.copy(text = newText))
+
+        try {
+            val regex = Regex("\\b${Regex.escape(query)}\\b")
+            // Search starting from current selection end
+            var match = regex.find(text, _content.value.selection.end)
+
+            // Wrap around to start of file if not found
+            if (match == null) {
+                match = regex.find(text, 0)
+            }
+
+            match?.let {
+                val range = it.range
+                val newText = text.replaceRange(range, replace)
+                // Move cursor to the end of the newly replaced text
+                val newCursorPos = range.first + replace.length
+                onContentChange(
+                    _content.value.copy(
+                        text = newText,
+                        selection = androidx.compose.ui.text.TextRange(newCursorPos)
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            // Fallback logic for non-word characters or errors
+            val index = text.indexOf(query, _content.value.selection.end)
+            val finalIndex = if (index != -1) index else text.indexOf(query, 0)
+            
+            if (finalIndex != -1) {
+                val newText = text.replaceRange(finalIndex, finalIndex + query.length, replace)
+                onContentChange(
+                    _content.value.copy(
+                        text = newText,
+                        selection = androidx.compose.ui.text.TextRange(finalIndex + replace.length)
+                    )
+                )
             }
         }
     }

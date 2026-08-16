@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -15,13 +16,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.OffsetMapping
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.ui.components.editor.EditorSidebar
 import com.example.myapplication.ui.components.editor.SearchReplaceSheet
@@ -47,9 +54,19 @@ fun EditorScreen(
     val showSearchReplace by viewModel.showSearchReplace.collectAsState()
     val isReplaceMode by viewModel.isReplaceMode.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val searchResults by viewModel.searchResults.collectAsState()
+    val currentIndex by viewModel.currentResultIndex.collectAsState()
     val replaceQuery by viewModel.replaceQuery.collectAsState()
     val saveStatus by viewModel.saveStatus.collectAsState()
     val recentFiles by homeViewModel.recentFiles.collectAsState()
+    
+    val focusRequester = remember { FocusRequester() }
+    
+    LaunchedEffect(showSearchReplace) {
+        if (showSearchReplace && !isReplaceMode) {
+            focusRequester.requestFocus()
+        }
+    }
     
     LaunchedEffect(fileName) {
         viewModel.loadFile(fileName)
@@ -57,31 +74,8 @@ fun EditorScreen(
     
     var isPreviewMode by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true
-    )
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-
-    if (showSearchReplace) {
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.toggleSearchReplace(isReplaceMode) },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
-            dragHandle = { BottomSheetDefaults.DragHandle() }
-        ) {
-            SearchReplaceSheet(
-                isReplaceMode = isReplaceMode,
-                searchQuery = searchQuery,
-                onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
-                replaceQuery = replaceQuery,
-                onReplaceQueryChange = { viewModel.onReplaceQueryChange(it) },
-                onReplaceNext = { viewModel.replaceNext() },
-                onReplaceAll = { viewModel.replaceAll() },
-                onDismiss = { viewModel.toggleSearchReplace(isReplaceMode) }
-            )
-        }
-    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -119,10 +113,29 @@ fun EditorScreen(
                         onReplaceClick = { viewModel.toggleSearchReplace(true) },
                         onSaveClick = { viewModel.saveFile(fileName) }
                     )
+                    
+                    if (showSearchReplace && !isReplaceMode) {
+                        EditorSearchBar(
+                            query = searchQuery,
+                            onQueryChange = { viewModel.onSearchQueryChange(it) },
+                            currentIndex = currentIndex,
+                            totalCount = searchResults.size,
+                            onNext = { viewModel.nextSearchResult() },
+                            onPrevious = { viewModel.previousSearchResult() },
+                            onClose = { viewModel.toggleSearchReplace(false) },
+                            focusRequester = focusRequester
+                        )
+                    }
                 }
             },
             bottomBar = {
                 Column {
+                    if (showSearchReplace && isReplaceMode) {
+                        // Keep old replace logic for now if it's replace mode, 
+                        // but the user said "Update only the Search UI for now"
+                        // I'll hide the replace UI from bottom bar if it was there?
+                        // Actually replace was a BottomSheet. 
+                    }
                     EditorStatusBar(
                         line = 11,
                         col = 25,
@@ -174,9 +187,30 @@ fun EditorScreen(
                                 } else {
                                     SyntaxHighlighter.highlightMarkdown(text.text)
                                 }
-                                androidx.compose.ui.text.input.TransformedText(
-                                    highlighted,
-                                    androidx.compose.ui.text.input.OffsetMapping.Identity
+                                
+                                val searchHighlighted = buildAnnotatedString {
+                                    append(highlighted)
+                                    if (searchQuery.isNotEmpty()) {
+                                        searchResults.forEachIndexed { index, range ->
+                                            val isCurrent = index == currentIndex
+                                            addStyle(
+                                                SpanStyle(
+                                                    background = if (isCurrent) 
+                                                        Color(0xFFA56F63) // PrimaryAccent for active
+                                                    else 
+                                                        Color(0xFFA56F63).copy(alpha = 0.3f), // Transparent accent for others
+                                                    color = if (isCurrent) Color.White else Color.Unspecified
+                                                ),
+                                                range.first,
+                                                range.last
+                                            )
+                                        }
+                                    }
+                                }
+                                
+                                TransformedText(
+                                    searchHighlighted,
+                                    OffsetMapping.Identity
                                 )
                             }
                         )
@@ -396,7 +430,7 @@ fun LineNumbers(lineCount: Int) {
 fun EditorStatusBar(line: Int, col: Int, fileType: String, saveStatus: String) {
     Surface(
         color = MaterialTheme.colorScheme.background,
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
     ) {
         Row(
             modifier = Modifier
@@ -436,6 +470,124 @@ fun EditorStatusBar(line: Int, col: Int, fileType: String, saveStatus: String) {
                         text = saveStatus,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditorSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    currentIndex: Int,
+    totalCount: Int,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    onClose: () -> Unit,
+    focusRequester: FocusRequester
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(24.dp), // More rounded like the home search bar
+        border = BorderStroke(
+            1.dp, 
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+        ),
+        tonalElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = Color.White
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                decorationBox = { innerTextField ->
+                    Box(contentAlignment = Alignment.CenterStart) {
+                        if (query.isEmpty()) {
+                            Text(
+                                "Search text...",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.White.copy(alpha = 0.4f)
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
+            )
+            
+            if (query.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = if (totalCount > 0) "${currentIndex + 1} / $totalCount" else "0 / 0",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onPrevious, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.KeyboardArrowUp, 
+                        contentDescription = "Previous", 
+                        tint = Color.White.copy(alpha = 0.8f)
+                    )
+                }
+                
+                IconButton(onClick = onNext, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown, 
+                        contentDescription = "Next", 
+                        tint = Color.White.copy(alpha = 0.8f)
+                    )
+                }
+                
+                VerticalDivider(
+                    modifier = Modifier
+                        .height(20.dp)
+                        .padding(horizontal = 4.dp),
+                    color = Color.White.copy(alpha = 0.2f)
+                )
+                
+                IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.Close, 
+                        contentDescription = "Close", 
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }

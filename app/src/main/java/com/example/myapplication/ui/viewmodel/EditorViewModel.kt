@@ -11,6 +11,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.Stack
 
+private enum class TokenType {
+    WORD, SYMBOL, OPERATOR, STRING, COMMENT, WHITESPACE, KEYWORD
+}
+
+private data class Token(val type: TokenType, val text: String)
+
 class EditorViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = FileRepository(application)
     
@@ -72,127 +78,268 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun formatKotlin(code: String): String {
-        val lines = code.lines()
-        val result = mutableListOf<String>()
-        var indentLevel = 0
-        
-        for (line in lines) {
-            val trimmed = line.trim()
-            if (trimmed.isEmpty()) {
-                result.add("")
-                continue
+        try {
+            val result = StringBuilder()
+            var indentLevel = 0
+            val tokens = getTokens(code)
+            
+            var i = 0
+            while (i < tokens.size) {
+                val token = tokens[i]
+                val type = token.type
+                val text = token.text
+
+                when (type) {
+                    TokenType.KEYWORD -> {
+                        val topLevelKeywords = setOf("fun", "class", "object", "interface", "typealias")
+                        if (indentLevel == 0 && topLevelKeywords.contains(text) && result.isNotEmpty() && !result.endsWith("\n\n")) {
+                            if (!result.endsWith("\n")) result.append("\n")
+                            result.append("\n")
+                        }
+                        
+                        if (result.isNotEmpty() && !result.endsWith(" ") && !result.endsWith("\n") && !result.endsWith("(")) {
+                            result.append(" ")
+                        }
+                        result.append(text)
+                        val next = nextNonSpace(tokens, i)
+                        if (next != null && next.text == "(") {
+                            result.append(" ")
+                        }
+                    }
+                    TokenType.SYMBOL -> {
+                        when (text) {
+                            "{" -> {
+                                if (result.isNotEmpty() && !result.endsWith(" ") && !result.endsWith("\n")) {
+                                    result.append(" ")
+                                }
+                                result.append("{\n")
+                                indentLevel++
+                                result.append("    ".repeat(indentLevel))
+                            }
+                            "}" -> {
+                                if (result.endsWith("    ")) {
+                                    result.setLength(result.length - 4)
+                                }
+                                if (!result.endsWith("\n")) {
+                                    result.append("\n")
+                                }
+                                
+                                indentLevel = (indentLevel - 1).coerceAtLeast(0)
+                                if (!result.endsWith("    ".repeat(indentLevel))) {
+                                    result.append("    ".repeat(indentLevel))
+                                }
+                                result.append("}")
+                                
+                                val next = nextNonSpace(tokens, i)
+                                if (next != null && (next.text == "else" || next.text == "catch" || next.text == "finally")) {
+                                    result.append(" ")
+                                } else {
+                                    result.append("\n")
+                                    result.append("    ".repeat(indentLevel))
+                                }
+                            }
+                            ";" -> {
+                                // Semicolons are mostly optional in Kotlin. We can convert them to newlines.
+                                val next = nextNonSpace(tokens, i)
+                                if (next != null && next.text != "}") {
+                                    if (!result.endsWith("\n")) result.append("\n")
+                                    result.append("    ".repeat(indentLevel))
+                                }
+                            }
+                            "," -> {
+                                result.append(", ")
+                            }
+                            ":" -> {
+                                // Simple heuristic for types and named arguments
+                                result.append(": ")
+                            }
+                            else -> result.append(text)
+                        }
+                    }
+                    TokenType.OPERATOR -> {
+                        val noSpaceOps = setOf(".", "!!", "::", "?.", "?:", "?.")
+                        if (noSpaceOps.contains(text)) {
+                            result.append(text)
+                        } else if (text == "<" || text == ">") {
+                            // Heuristic for generics vs comparison
+                            val prev = lastNonSpaceToken(tokens, i)
+                            val next = nextNonSpace(tokens, i)
+                            if (prev != null && prev.type == TokenType.WORD && prev.text.firstOrNull()?.isUpperCase() == true) {
+                                // Likely generic
+                                result.append(text)
+                            } else {
+                                if (result.isNotEmpty() && !result.endsWith(" ") && !result.endsWith("\n")) result.append(" ")
+                                result.append(text)
+                                if (next != null && !next.text.startsWith(" ")) result.append(" ")
+                            }
+                        } else {
+                            if (result.isNotEmpty() && !result.endsWith(" ") && !result.endsWith("\n")) {
+                                result.append(" ")
+                            }
+                            result.append(text)
+                            val next = nextNonSpace(tokens, i)
+                            if (next != null && next.text != ";" && next.text != "," && next.text != ")") {
+                                result.append(" ")
+                            }
+                        }
+                    }
+                    TokenType.STRING, TokenType.COMMENT, TokenType.WORD -> {
+                        if (type == TokenType.WORD && result.isNotEmpty() && !result.endsWith(" ") && !result.endsWith("\n") && !result.endsWith("(") && !result.endsWith(".") && !result.endsWith("?") && !result.endsWith("!")) {
+                            // Check if current text is a number and previous is an operator like -
+                            result.append(" ")
+                        }
+                        result.append(text)
+                        if (type == TokenType.COMMENT && text.startsWith("//")) {
+                            result.append("\n")
+                            result.append("    ".repeat(indentLevel))
+                        }
+                    }
+                    TokenType.WHITESPACE -> {
+                        if (text.contains("\n\n")) {
+                            result.append("\n\n")
+                            result.append("    ".repeat(indentLevel))
+                        }
+                    }
+                }
+                i++
             }
 
-            if (trimmed.startsWith("}") || trimmed.startsWith(")") || trimmed.startsWith("]")) {
-                indentLevel = (indentLevel - 1).coerceAtLeast(0)
-            }
-
-            val formattedLine = formatLineContent(trimmed)
-            result.add("    ".repeat(indentLevel) + formattedLine)
-
-            val net = calculateNetBraces(trimmed)
-            if (trimmed.startsWith("}") || trimmed.startsWith(")") || trimmed.startsWith("]")) {
-                indentLevel += (net + 1)
-            } else {
-                indentLevel += net
-            }
-            indentLevel = indentLevel.coerceAtLeast(0)
+            return finalizeFormatting(result.toString())
+        } catch (e: Exception) {
+            return code
         }
-        return result.joinToString("\n")
     }
 
-    private fun calculateNetBraces(line: String): Int {
-        var net = 0
-        var inString = false
-        var i = 0
-        while (i < line.length) {
-            val c = line[i]
-            if (c == '\"' && (i == 0 || line[i-1] != '\\')) inString = !inString
-            if (!inString) {
-                if (c == '{' || c == '(' || c == '[') net++
-                if (c == '}' || c == ')' || c == ']') net--
-            }
-            i++
+    private fun lastNonSpaceToken(tokens: List<Token>, current: Int): Token? {
+        for (j in current - 1 downTo 0) {
+            if (tokens[j].type != TokenType.WHITESPACE) return tokens[j]
         }
-        return net
+        return null
     }
 
-    private fun formatLineContent(line: String): String {
-        val sb = StringBuilder()
-        var inString = false
+    private fun nextNonSpace(tokens: List<Token>, current: Int): Token? {
+        for (j in current + 1 until tokens.size) {
+            if (tokens[j].type != TokenType.WHITESPACE) return tokens[j]
+        }
+        return null
+    }
+
+    private fun finalizeFormatting(code: String): String {
+        return code.lines()
+            .map { it.trimEnd() }
+            .filterIndexed { index, line -> 
+                // Remove lines that are just whitespace introduced by our logic but don't follow a { or ;
+                line.isNotBlank() || (index > 0 && code.lines()[index-1].isBlank())
+            }
+            .joinToString("\n")
+            .trim()
+    }
+
+    private fun getTokens(code: String): List<Token> {
+        val tokens = mutableListOf<Token>()
         var i = 0
-        while (i < line.length) {
-            val c = line[i]
-            if (c == '\"' && (i == 0 || line[i-1] != '\\')) {
-                inString = !inString
-                sb.append(c)
-                i++
+        val keywords = setOf("package", "import", "class", "interface", "object", "fun", "val", "var", "if", "else", "for", "while", "do", "when", "try", "catch", "finally", "return", "throw", "break", "continue", "as", "is", "in", "this", "super", "typealias", "typeof")
+
+        while (i < code.length) {
+            val c = code[i]
+            
+            // Whitespace
+            if (c.isWhitespace()) {
+                val start = i
+                while (i < code.length && code[i].isWhitespace()) i++
+                tokens.add(Token(TokenType.WHITESPACE, code.substring(start, i)))
                 continue
             }
-            if (inString) {
-                sb.append(c)
-                i++
+
+            // String literals
+            if (c == '\"') {
+                val start = i
+                if (i + 2 < code.length && code[i+1] == '\"' && code[i+2] == '\"') {
+                    i += 3
+                    while (i + 2 < code.length && !(code[i] == '\"' && code[i+1] == '\"' && code[i+2] == '\"')) i++
+                    i += 3
+                } else {
+                    i++
+                    while (i < code.length && code[i] != '\"') {
+                        if (code[i] == '\\' && i + 1 < code.length) i++
+                        i++
+                    }
+                    i++
+                }
+                tokens.add(Token(TokenType.STRING, code.substring(start, i.coerceAtMost(code.length))))
                 continue
             }
-            if (i + 1 < line.length && line[i] == '/' && line[i+1] == '/') {
-                sb.append(line.substring(i))
-                break
-            }
-            if (c == ',') {
-                sb.append(", ")
-                i++
-                while (i < line.length && line[i] == ' ') i++
-                continue
-            }
-            if (c == '{') {
-                if (sb.isNotEmpty() && sb.last() != ' ') sb.append(" ")
-                sb.append("{")
-                i++
-                continue
-            }
-            val keywords = listOf("if", "for", "while", "when", "catch")
-            var foundKeyword = false
-            for (kw in keywords) {
-                if (line.startsWith(kw, i) && (i + kw.length == line.length || !line[i + kw.length].isLetterOrDigit())) {
-                    sb.append(kw)
-                    i += kw.length
-                    if (i < line.length && line[i] == '(') sb.append(" ")
-                    foundKeyword = true
-                    break
+
+            // Comments
+            if (c == '/' && i + 1 < code.length) {
+                if (code[i+1] == '/') {
+                    val start = i
+                    while (i < code.length && code[i] != '\n') i++
+                    tokens.add(Token(TokenType.COMMENT, code.substring(start, i)))
+                    continue
+                } else if (code[i+1] == '*') {
+                    val start = i
+                    i += 2
+                    while (i + 1 < code.length && !(code[i] == '*' && code[i+1] == '/')) i++
+                    i += 2
+                    tokens.add(Token(TokenType.COMMENT, code.substring(start, i.coerceAtMost(code.length))))
+                    continue
                 }
             }
-            if (foundKeyword) continue
-            val multiOps = listOf("==", "!=", "+=", "-=", "*=", "/=", ">=", "<=", "&&", "||")
-            var foundOp = false
-            for (op in multiOps) {
-                if (line.startsWith(op, i)) {
-                    if (sb.isNotEmpty() && sb.last() != ' ') sb.append(" ")
-                    sb.append(op)
-                    i += op.length
-                    if (i < line.length && line[i] != ' ') sb.append(" ")
-                    foundOp = true
-                    break
+
+            // Symbols
+            if ("{}()[];,.:".contains(c)) {
+                var text = c.toString()
+                if (c == '?' && i + 1 < code.length && ".:".contains(code[i+1])) {
+                    // Handled as operator
+                } else if (c == ':' && i + 1 < code.length && code[i+1] == ':') {
+                    text = "::"
+                    i++
+                } else {
+                    tokens.add(Token(TokenType.SYMBOL, text))
+                    i++
+                    continue
                 }
             }
-            if (foundOp) continue
-            val singleOps = listOf("=", "+", "-", "*", "/", ">", "<")
-            for (op in singleOps) {
-                if (line.startsWith(op, i)) {
-                    if (op == "-" && i + 1 < line.length && line[i+1] == '>') break
-                    if (op == "!" && i + 1 < line.length && line[i+1] == '!') break
-                    if (sb.isNotEmpty() && sb.last() != ' ') sb.append(" ")
-                    sb.append(op)
-                    i += op.length
-                    if (i < line.length && line[i] != ' ') sb.append(" ")
-                    foundOp = true
-                    break
+
+            // Operators
+            val operators = "+-*/%=!><&|?->"
+            if (operators.contains(c)) {
+                val start = i
+                i++
+                while (i < code.length && operators.contains(code[i])) {
+                    // Avoid merging -> with other ops if necessary, but Kotlin has many multi-char ops
+                    i++
                 }
+                val opText = code.substring(start, i)
+                tokens.add(Token(TokenType.OPERATOR, opText))
+                continue
             }
-            if (foundOp) continue
-            sb.append(c)
+
+            // Words (Identifiers, Keywords, Numbers)
+            if (c.isLetterOrDigit() || c == '_' || c == '`') {
+                val start = i
+                if (c == '`') {
+                    i++
+                    while (i < code.length && code[i] != '`') i++
+                    i++
+                } else {
+                    while (i < code.length && (code[i].isLetterOrDigit() || code[i] == '_')) i++
+                }
+                val word = code.substring(start, i)
+                if (keywords.contains(word)) {
+                    tokens.add(Token(TokenType.KEYWORD, word))
+                } else {
+                    tokens.add(Token(TokenType.WORD, word))
+                }
+                continue
+            }
+
+            // Any other char
+            tokens.add(Token(TokenType.SYMBOL, c.toString()))
             i++
         }
-        return sb.toString().trim().replace(Regex(" +"), " ")
+        return tokens
     }
 
     fun onContentChange(newValue: TextFieldValue) {

@@ -423,13 +423,14 @@ fun EditorToolbar(
                 tint = if (isWordWrapEnabled) Color(0xFFA56F63) else Color.LightGray
             )
         }
+
         
-        Spacer(modifier = Modifier.width(16.dp))
+
         
         IconButton(onClick = onFormatClick) {
             Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Format", tint = Color.LightGray)
         }
-        
+
         Spacer(modifier = Modifier.weight(1f))
         
         IconButton(onClick = onSearchClick) {

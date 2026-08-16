@@ -73,7 +73,7 @@ object SyntaxHighlighter {
     fun highlightMarkdown(text: String): AnnotatedString {
         return buildAnnotatedString {
             val regex = Regex(
-                "(^#+.*$)|(\\*\\*.*?\\*\\*)|(\\*.*?\\*)|(\\[.*?\\]\\(.*?\\))|(^\\s*[-*+]\\s+.*$)",
+                "(^#+.*$)|(\\*\\*.*?\\*\\*)|(\\*.*?\\*)|(~~.*?~~)|(`.*?`)|(\\[.*?\\]\\(.*?\\))|(^\\s*[-*+]\\s+.*$)|(^\\s*\\d+\\.\\s+.*$)|(^>.*$)|(```[\\s\\S]*?```)",
                 RegexOption.MULTILINE
             )
             
@@ -87,16 +87,28 @@ object SyntaxHighlighter {
                         withStyle(SpanStyle(color = colors.keyword, fontWeight = FontWeight.Bold)) { append(matchText) }
                     }
                     matchText.startsWith("**") -> {
-                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(matchText) }
+                        withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append(matchText) }
                     }
-                    matchText.startsWith("*") -> {
-                        withStyle(SpanStyle(fontWeight = FontWeight.Medium)) { append(matchText) }
+                    matchText.startsWith("~~") -> {
+                        withStyle(SpanStyle(color = Color.Gray.copy(alpha = 0.6f))) { append(matchText) }
+                    }
+                    matchText.startsWith("*") || matchText.startsWith("_") -> {
+                        withStyle(SpanStyle(color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.Medium)) { append(matchText) }
+                    }
+                    matchText.startsWith("`") -> {
+                        withStyle(SpanStyle(color = Color(0xFF4CAF50), background = Color(0xFF4CAF50).copy(alpha = 0.1f))) { append(matchText) }
                     }
                     matchText.startsWith("[") -> {
-                        withStyle(SpanStyle(color = colors.type)) { append(matchText) }
+                        withStyle(SpanStyle(color = Color(0xFF64B5F6))) { append(matchText) }
                     }
-                    matchText.trim().startsWith("-") || matchText.trim().startsWith("*") || matchText.trim().startsWith("+") -> {
+                    matchText.trim().startsWith("-") || matchText.trim().startsWith("*") || matchText.trim().startsWith("+") || matchText.trim().firstOrNull()?.isDigit() == true -> {
                         withStyle(SpanStyle(color = colors.annotation)) { append(matchText) }
+                    }
+                    matchText.startsWith(">") -> {
+                        withStyle(SpanStyle(color = Color(0xFF4CAF50))) { append(matchText) }
+                    }
+                    matchText.startsWith("```") -> {
+                        withStyle(SpanStyle(color = colors.comment)) { append(matchText) }
                     }
                     else -> append(matchText)
                 }

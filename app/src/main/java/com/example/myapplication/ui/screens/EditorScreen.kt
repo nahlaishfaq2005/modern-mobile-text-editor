@@ -25,14 +25,19 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
@@ -170,6 +175,42 @@ fun EditorScreen(
                             onClose = { viewModel.toggleSearchReplace(false) },
                             focusRequester = focusRequester
                         )
+                    }
+
+                    if (fileType == "Markdown") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                .padding(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Button(
+                                onClick = { isPreviewMode = false },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (!isPreviewMode) Color(0xFFA56F63) else Color.Transparent,
+                                    contentColor = if (!isPreviewMode) Color.White else Color.Gray
+                                ),
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(vertical = 8.dp)
+                            ) {
+                                Text("Editor", style = MaterialTheme.typography.labelLarge)
+                            }
+                            Button(
+                                onClick = { isPreviewMode = true },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isPreviewMode) Color(0xFFA56F63) else Color.Transparent,
+                                    contentColor = if (isPreviewMode) Color.White else Color.Gray
+                                ),
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(vertical = 8.dp)
+                            ) {
+                                Text("Preview", style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
                     }
                 }
             },
@@ -788,33 +829,296 @@ fun MarkdownPreview(text: String) {
             .fillMaxSize()
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         val lines = text.lines()
+        var inCodeBlock = false
+        val codeBlockContent = StringBuilder()
+        
         lines.forEach { line ->
             when {
+                line.startsWith("```") -> {
+                    if (inCodeBlock) {
+                        // End of code block
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.Black.copy(alpha = 0.3f)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = codeBlockContent.toString().trim(),
+                                modifier = Modifier.padding(12.dp),
+                                style = TextStyle(
+                                    color = Color(0xFFD99B7F),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 14.sp
+                                )
+                            )
+                        }
+                        codeBlockContent.clear()
+                        inCodeBlock = false
+                    } else {
+                        inCodeBlock = true
+                    }
+                }
+                inCodeBlock -> {
+                    codeBlockContent.append(line).append("\n")
+                }
                 line.startsWith("# ") -> {
                     Text(
                         text = line.removePrefix("# "),
-                        style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 32.sp
+                        ),
+                        color = Color.White,
+                        modifier = Modifier.padding(top = 8.dp)
                     )
                 }
                 line.startsWith("## ") -> {
                     Text(
                         text = line.removePrefix("## "),
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 24.sp
+                        ),
+                        color = Color.White,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
-                else -> {
-                    Text(
-                        text = SyntaxHighlighter.highlightMarkdown(line),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
+                line.startsWith("> ") -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(4.dp)
+                                .height(IntrinsicSize.Min)
+                                .background(Color(0xFF4CAF50), RoundedCornerShape(2.dp))
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = line.removePrefix("> "),
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontStyle = FontStyle.Italic
+                            ),
+                            color = Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+                line.trim().startsWith("- ") || line.trim().startsWith("* ") -> {
+                    Row(modifier = Modifier.padding(start = 8.dp)) {
+                        Text("•", color = Color.White, modifier = Modifier.padding(end = 8.dp))
+                        Text(
+                            text = renderMarkdownText(line.trim().substring(2)),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White.copy(alpha = 0.9f)
+                        )
+                    }
+                }
+                line.trim().firstOrNull()?.isDigit() == true && line.contains(". ") -> {
+                    val dotIndex = line.indexOf(". ")
+                    if (dotIndex != -1) {
+                        Row(modifier = Modifier.padding(start = 8.dp)) {
+                            Text(line.substring(0, dotIndex + 1), color = Color.White, modifier = Modifier.padding(end = 8.dp))
+                            Text(
+                                text = renderMarkdownText(line.substring(dotIndex + 2)),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.White.copy(alpha = 0.9f)
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = renderMarkdownText(line),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White.copy(alpha = 0.9f)
+                        )
+                    }
+                }
+                line.isBlank() -> {
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
             }
         }
+
+        // FOOTER SECTION: "How it works" and "Supported Markdown"
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "How it works",
+            style = MaterialTheme.typography.titleMedium,
+            color = Color(0xFFA56F63),
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            InfoStep(
+                icon = Icons.Default.Edit,
+                title = "1. Write in Editor",
+                desc = "Type Markdown with syntax highlighting."
+            )
+            InfoStep(
+                icon = Icons.Default.Visibility,
+                title = "2. Tap Preview",
+                desc = "See the rendered output instantly."
+            )
+            InfoStep(
+                icon = Icons.Default.EditNote,
+                title = "3. Tap Editor",
+                desc = "Go back to edit your Markdown."
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.Black.copy(alpha = 0.2f)
+            ),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Supported Markdown",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        MarkdownFeatureItem("Headings")
+                        MarkdownFeatureItem("Bold / Italic")
+                        MarkdownFeatureItem("Strikethrough")
+                        MarkdownFeatureItem("Inline Code")
+                        MarkdownFeatureItem("Code Blocks")
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        MarkdownFeatureItem("Blockquotes")
+                        MarkdownFeatureItem("Lists (UL/OL)")
+                        MarkdownFeatureItem("Links")
+                        MarkdownFeatureItem("And more...")
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+fun renderMarkdownText(text: String): AnnotatedString {
+    return buildAnnotatedString {
+        val regex = Regex("(\\*\\*.*?\\*\\*)|(\\*.*?\\*)|(~~.*?~~)|(`.*?`)|(\\[.*?\\]\\(.*?\\))")
+        var lastMatchEnd = 0
+        
+        regex.findAll(text).forEach { match ->
+            append(text.substring(lastMatchEnd, match.range.first))
+            
+            val matchText = match.value
+            when {
+                matchText.startsWith("**") -> {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) {
+                        append(matchText.removeSurrounding("**"))
+                    }
+                }
+                matchText.startsWith("~~") -> {
+                    withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough, color = Color.Gray)) {
+                        append(matchText.removeSurrounding("~~"))
+                    }
+                }
+                matchText.startsWith("*") -> {
+                    withStyle(SpanStyle(fontStyle = FontStyle.Italic, color = Color.White.copy(alpha = 0.9f))) {
+                        append(matchText.removeSurrounding("*"))
+                    }
+                }
+                matchText.startsWith("`") -> {
+                    withStyle(
+                        SpanStyle(
+                            color = Color(0xFF4CAF50),
+                            background = Color(0xFF4CAF50).copy(alpha = 0.1f),
+                            fontFamily = FontFamily.Monospace
+                        )
+                    ) {
+                        append(matchText.removeSurrounding("`"))
+                    }
+                }
+                matchText.startsWith("[") -> {
+                    val linkText = matchText.substringAfter("[").substringBefore("]")
+                    withStyle(SpanStyle(color = Color(0xFF64B5F6), textDecoration = TextDecoration.Underline)) {
+                        append(linkText)
+                    }
+                }
+                else -> append(matchText)
+            }
+            lastMatchEnd = match.range.last + 1
+        }
+        append(text.substring(lastMatchEnd))
+    }
+}
+
+@Composable
+fun RowScope.InfoStep(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, desc: String) {
+    Column(
+        modifier = Modifier.weight(1f),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(10.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+            color = Color.White,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = desc,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+            color = Color.White.copy(alpha = 0.5f),
+            textAlign = TextAlign.Center,
+            lineHeight = 12.sp
+        )
+    }
+}
+
+@Composable
+fun MarkdownFeatureItem(text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 2.dp)
+    ) {
+        Icon(
+            Icons.Default.Check,
+            contentDescription = null,
+            tint = Color(0xFF4CAF50),
+            modifier = Modifier.size(12.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.6f)
+        )
     }
 }

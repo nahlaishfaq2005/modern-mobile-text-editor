@@ -348,7 +348,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         if (oldText != newText) {
             undoStack.push(_content.value)
             redoStack.clear()
-            _saveStatus.value = "Unsaved Changes"
+            _saveStatus.value = "Unsaved"
             _content.value = newValue
             if (_showSearchReplace.value) {
                 updateSearchResults(_searchQuery.value)

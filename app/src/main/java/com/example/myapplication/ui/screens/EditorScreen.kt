@@ -157,7 +157,7 @@ fun EditorScreen(
                         onSearchClick = { viewModel.toggleSearchReplace(false) },
                         onReplaceClick = { viewModel.toggleSearchReplace(true) },
                         onSaveClick = { viewModel.saveFile(fileName) },
-                        showFormat = !isPreviewMode
+                        showFormat = fileType != "Markdown"
                     )
                     
                         if (showSearchReplace) {

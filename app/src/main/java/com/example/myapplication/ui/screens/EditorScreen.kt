@@ -426,10 +426,18 @@ fun EditorToolbar(
 
         
 
-        
+//
+//        IconButton(onClick = onFormatClick) {
+//            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Format", tint = Color.LightGray)
+//        }
         IconButton(onClick = onFormatClick) {
-            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Format", tint = Color.LightGray)
+            Icon(
+                imageVector = Icons.Default.DataObject,
+                contentDescription = "Format Code",
+                tint = Color.LightGray
+            )
         }
+
 
         Spacer(modifier = Modifier.weight(1f))
         

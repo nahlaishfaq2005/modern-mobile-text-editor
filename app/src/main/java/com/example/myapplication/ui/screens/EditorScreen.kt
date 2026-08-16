@@ -648,34 +648,24 @@ fun EditorStatusBar(line: Int, col: Int, fileType: String, saveStatus: String, i
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isReadOnly) {
-                    Icon(
-                        Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = Color(0xFFA56F63),
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        "Read-Only",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color(0xFFA56F63)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                }
+                Icon(
+                    imageVector = if (isReadOnly) Icons.Default.Lock else Icons.Default.LockOpen,
+                    contentDescription = null,
+                    tint = if (isReadOnly) Color(0xFFA56F63) else Color(0xFF4CAF50),
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isReadOnly) "Read-Only" else "Editable",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = if (isReadOnly) Color(0xFFA56F63) else Color(0xFF4CAF50)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
 //                Text(
 //                    text = "Ln $line    Col $col    UTF-8",
 //                    style = MaterialTheme.typography.labelSmall,
 //                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
 //                )
-                Text(
-                    "EDIT MODE",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = Color(0xFFD99B7F)
-                )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

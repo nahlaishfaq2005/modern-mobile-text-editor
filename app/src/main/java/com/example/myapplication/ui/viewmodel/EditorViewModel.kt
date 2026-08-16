@@ -61,6 +61,140 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun formatCode() {
+        val currentText = _content.value.text
+        if (currentText.isBlank()) return
+
+        val formatted = formatKotlin(currentText)
+        if (formatted != currentText) {
+            onContentChange(_content.value.copy(text = formatted))
+        }
+    }
+
+    private fun formatKotlin(code: String): String {
+        val lines = code.lines()
+        val result = mutableListOf<String>()
+        var indentLevel = 0
+        
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.isEmpty()) {
+                result.add("")
+                continue
+            }
+
+            if (trimmed.startsWith("}") || trimmed.startsWith(")") || trimmed.startsWith("]")) {
+                indentLevel = (indentLevel - 1).coerceAtLeast(0)
+            }
+
+            val formattedLine = formatLineContent(trimmed)
+            result.add("    ".repeat(indentLevel) + formattedLine)
+
+            val net = calculateNetBraces(trimmed)
+            if (trimmed.startsWith("}") || trimmed.startsWith(")") || trimmed.startsWith("]")) {
+                indentLevel += (net + 1)
+            } else {
+                indentLevel += net
+            }
+            indentLevel = indentLevel.coerceAtLeast(0)
+        }
+        return result.joinToString("\n")
+    }
+
+    private fun calculateNetBraces(line: String): Int {
+        var net = 0
+        var inString = false
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            if (c == '\"' && (i == 0 || line[i-1] != '\\')) inString = !inString
+            if (!inString) {
+                if (c == '{' || c == '(' || c == '[') net++
+                if (c == '}' || c == ')' || c == ']') net--
+            }
+            i++
+        }
+        return net
+    }
+
+    private fun formatLineContent(line: String): String {
+        val sb = StringBuilder()
+        var inString = false
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            if (c == '\"' && (i == 0 || line[i-1] != '\\')) {
+                inString = !inString
+                sb.append(c)
+                i++
+                continue
+            }
+            if (inString) {
+                sb.append(c)
+                i++
+                continue
+            }
+            if (i + 1 < line.length && line[i] == '/' && line[i+1] == '/') {
+                sb.append(line.substring(i))
+                break
+            }
+            if (c == ',') {
+                sb.append(", ")
+                i++
+                while (i < line.length && line[i] == ' ') i++
+                continue
+            }
+            if (c == '{') {
+                if (sb.isNotEmpty() && sb.last() != ' ') sb.append(" ")
+                sb.append("{")
+                i++
+                continue
+            }
+            val keywords = listOf("if", "for", "while", "when", "catch")
+            var foundKeyword = false
+            for (kw in keywords) {
+                if (line.startsWith(kw, i) && (i + kw.length == line.length || !line[i + kw.length].isLetterOrDigit())) {
+                    sb.append(kw)
+                    i += kw.length
+                    if (i < line.length && line[i] == '(') sb.append(" ")
+                    foundKeyword = true
+                    break
+                }
+            }
+            if (foundKeyword) continue
+            val multiOps = listOf("==", "!=", "+=", "-=", "*=", "/=", ">=", "<=", "&&", "||")
+            var foundOp = false
+            for (op in multiOps) {
+                if (line.startsWith(op, i)) {
+                    if (sb.isNotEmpty() && sb.last() != ' ') sb.append(" ")
+                    sb.append(op)
+                    i += op.length
+                    if (i < line.length && line[i] != ' ') sb.append(" ")
+                    foundOp = true
+                    break
+                }
+            }
+            if (foundOp) continue
+            val singleOps = listOf("=", "+", "-", "*", "/", ">", "<")
+            for (op in singleOps) {
+                if (line.startsWith(op, i)) {
+                    if (op == "-" && i + 1 < line.length && line[i+1] == '>') break
+                    if (op == "!" && i + 1 < line.length && line[i+1] == '!') break
+                    if (sb.isNotEmpty() && sb.last() != ' ') sb.append(" ")
+                    sb.append(op)
+                    i += op.length
+                    if (i < line.length && line[i] != ' ') sb.append(" ")
+                    foundOp = true
+                    break
+                }
+            }
+            if (foundOp) continue
+            sb.append(c)
+            i++
+        }
+        return sb.toString().trim().replace(Regex(" +"), " ")
+    }
+
     fun onContentChange(newValue: TextFieldValue) {
         val oldText = _content.value.text
         val newText = newValue.text

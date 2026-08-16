@@ -140,14 +140,15 @@ fun EditorScreen(
                         onMenuClick = { scope.launch { drawerState.open() } },
                         showMoreMenu = showMoreMenu,
                         onMoreMenuToggle = { showMoreMenu = it },
-                        onSaveClick = { viewModel.saveFile(fileName) }
+                        onSaveClick = { viewModel.saveFile(fileName) },
+                        onFormatClick = { viewModel.formatCode() }
                     )
                     EditorToolbar(
                         onUndo = { viewModel.undo() },
                         onRedo = { viewModel.redo() },
                         onWordWrapToggle = { viewModel.toggleWordWrap() },
                         isWordWrapEnabled = isWordWrapEnabled,
-                        onFormatClick = { /* Format logic */ },
+                        onFormatClick = { viewModel.formatCode() },
                         onSearchClick = { viewModel.toggleSearchReplace(false) },
                         onReplaceClick = { viewModel.toggleSearchReplace(true) },
                         onSaveClick = { viewModel.saveFile(fileName) }
@@ -281,7 +282,8 @@ fun EditorTopBar(
     onMenuClick: () -> Unit,
     showMoreMenu: Boolean,
     onMoreMenuToggle: (Boolean) -> Unit,
-    onSaveClick: () -> Unit
+    onSaveClick: () -> Unit,
+    onFormatClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -388,7 +390,10 @@ fun EditorTopBar(
                     if (fileType == "Kotlin") {
                         DropdownMenuItem(
                             text = { Text("Format Code") },
-                            onClick = { onMoreMenuToggle(false) },
+                            onClick = { 
+                                onFormatClick()
+                                onMoreMenuToggle(false) 
+                            },
                             leadingIcon = { Icon(Icons.AutoMirrored.Filled.FormatAlignLeft, contentDescription = null) }
                         )
                     }

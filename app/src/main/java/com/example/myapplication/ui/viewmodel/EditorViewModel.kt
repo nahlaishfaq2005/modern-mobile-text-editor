@@ -114,10 +114,21 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
         val text = _content.value.text
         val results = mutableListOf<IntRange>()
-        var index = text.indexOf(query, 0, ignoreCase = true)
-        while (index != -1) {
-            results.add(IntRange(index, index + query.length))
-            index = text.indexOf(query, index + query.length, ignoreCase = true)
+        
+        try {
+            // Use word boundaries \b to ensure only whole words are matched
+            val regex = Regex("\\b${Regex.escape(query)}\\b", RegexOption.IGNORE_CASE)
+            regex.findAll(text).forEach { match ->
+                // Store as IntRange(start, exclusive_end) to match previous logic
+                results.add(IntRange(match.range.first, match.range.last + 1))
+            }
+        } catch (e: Exception) {
+            // Fallback to simple search if regex fails
+            var index = text.indexOf(query, 0, ignoreCase = true)
+            while (index != -1) {
+                results.add(IntRange(index, index + query.length))
+                index = text.indexOf(query, index + query.length, ignoreCase = true)
+            }
         }
         
         _searchResults.value = results
@@ -162,7 +173,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
         try {
             // Use word boundaries \b to ensure only whole words are replaced
-            val regex = Regex("\\b${Regex.escape(query)}\\b")
+            val regex = Regex("\\b${Regex.escape(query)}\\b", RegexOption.IGNORE_CASE)
             val newText = _content.value.text.replace(regex, replace)
             onContentChange(_content.value.copy(text = newText))
         } catch (e: Exception) {
@@ -179,7 +190,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         if (query.isEmpty()) return
 
         try {
-            val regex = Regex("\\b${Regex.escape(query)}\\b")
+            val regex = Regex("\\b${Regex.escape(query)}\\b", RegexOption.IGNORE_CASE)
             // Search starting from current selection end
             var match = regex.find(text, _content.value.selection.end)
 

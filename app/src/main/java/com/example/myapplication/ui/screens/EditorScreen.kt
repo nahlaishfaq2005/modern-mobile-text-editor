@@ -156,7 +156,8 @@ fun EditorScreen(
                         onFormatClick = { viewModel.formatCode() },
                         onSearchClick = { viewModel.toggleSearchReplace(false) },
                         onReplaceClick = { viewModel.toggleSearchReplace(true) },
-                        onSaveClick = { viewModel.saveFile(fileName) }
+                        onSaveClick = { viewModel.saveFile(fileName) },
+                        showFormat = !isPreviewMode
                     )
                     
                         if (showSearchReplace) {
@@ -458,7 +459,8 @@ fun EditorToolbar(
     onFormatClick: () -> Unit,
     onSearchClick: () -> Unit,
     onReplaceClick: () -> Unit,
-    onSaveClick: () -> Unit
+    onSaveClick: () -> Unit,
+    showFormat: Boolean = true
 ) {
     Row(
         modifier = Modifier
@@ -481,12 +483,14 @@ fun EditorToolbar(
             )
         }
 
-        IconButton(onClick = onFormatClick) {
-            Icon(
-                imageVector = Icons.Default.DataObject,
-                contentDescription = "Format Code",
-                tint = Color.LightGray
-            )
+        if (showFormat) {
+            IconButton(onClick = onFormatClick) {
+                Icon(
+                    imageVector = Icons.Default.DataObject,
+                    contentDescription = "Format Code",
+                    tint = Color.LightGray
+                )
+            }
         }
 
 
@@ -892,17 +896,18 @@ fun MarkdownPreview(text: String) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .height(IntrinsicSize.Min)
                             .padding(vertical = 4.dp)
                     ) {
                         Box(
                             modifier = Modifier
                                 .width(4.dp)
-                                .height(IntrinsicSize.Min)
+                                .fillMaxHeight()
                                 .background(Color(0xFF4CAF50), RoundedCornerShape(2.dp))
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = line.removePrefix("> "),
+                            text = renderMarkdownText(line.removePrefix("> ")),
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontStyle = FontStyle.Italic
                             ),
@@ -942,76 +947,12 @@ fun MarkdownPreview(text: String) {
                 line.isBlank() -> {
                     Spacer(modifier = Modifier.height(4.dp))
                 }
-            }
-        }
-
-        // FOOTER SECTION: "How it works" and "Supported Markdown"
-        Spacer(modifier = Modifier.height(24.dp))
-        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "How it works",
-            style = MaterialTheme.typography.titleMedium,
-            color = Color(0xFFA56F63),
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            InfoStep(
-                icon = Icons.Default.Edit,
-                title = "1. Write in Editor",
-                desc = "Type Markdown with syntax highlighting."
-            )
-            InfoStep(
-                icon = Icons.Default.Visibility,
-                title = "2. Tap Preview",
-                desc = "See the rendered output instantly."
-            )
-            InfoStep(
-                icon = Icons.Default.EditNote,
-                title = "3. Tap Editor",
-                desc = "Go back to edit your Markdown."
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = Color.Black.copy(alpha = 0.2f)
-            ),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Supported Markdown",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = Color.White.copy(alpha = 0.7f)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        MarkdownFeatureItem("Headings")
-                        MarkdownFeatureItem("Bold / Italic")
-                        MarkdownFeatureItem("Strikethrough")
-                        MarkdownFeatureItem("Inline Code")
-                        MarkdownFeatureItem("Code Blocks")
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        MarkdownFeatureItem("Blockquotes")
-                        MarkdownFeatureItem("Lists (UL/OL)")
-                        MarkdownFeatureItem("Links")
-                        MarkdownFeatureItem("And more...")
-                    }
+                else -> {
+                    Text(
+                        text = renderMarkdownText(line),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
                 }
             }
         }
@@ -1022,7 +963,7 @@ fun MarkdownPreview(text: String) {
 @Composable
 fun renderMarkdownText(text: String): AnnotatedString {
     return buildAnnotatedString {
-        val regex = Regex("(\\*\\*.*?\\*\\*)|(\\*.*?\\*)|(~~.*?~~)|(`.*?`)|(\\[.*?\\]\\(.*?\\))")
+        val regex = Regex("(\\*\\*.*?\\*\\*)|(\\*.*?\\*)|(_.*?_)|(~~.*?~~)|(`.*?`)|(\\[.*?\\]\\(.*?\\))")
         var lastMatchEnd = 0
         
         regex.findAll(text).forEach { match ->
@@ -1043,6 +984,11 @@ fun renderMarkdownText(text: String): AnnotatedString {
                 matchText.startsWith("*") -> {
                     withStyle(SpanStyle(fontStyle = FontStyle.Italic, color = Color.White.copy(alpha = 0.9f))) {
                         append(matchText.removeSurrounding("*"))
+                    }
+                }
+                matchText.startsWith("_") -> {
+                    withStyle(SpanStyle(fontStyle = FontStyle.Italic, color = Color.White.copy(alpha = 0.9f))) {
+                        append(matchText.removeSurrounding("_"))
                     }
                 }
                 matchText.startsWith("`") -> {

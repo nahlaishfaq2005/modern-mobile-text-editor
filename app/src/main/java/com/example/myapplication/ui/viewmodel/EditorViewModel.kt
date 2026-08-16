@@ -20,7 +20,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val undoStack = Stack<TextFieldValue>()
     private val redoStack = Stack<TextFieldValue>()
 
-    private val _isWordWrapEnabled = MutableStateFlow(false)
+    private val _isWordWrapEnabled = MutableStateFlow(true)
     val isWordWrapEnabled: StateFlow<Boolean> = _isWordWrapEnabled.asStateFlow()
 
     private val _showSearchReplace = MutableStateFlow(false)
@@ -62,12 +62,19 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun onContentChange(newValue: TextFieldValue) {
-        if (_content.value.text != newValue.text) {
+        val oldText = _content.value.text
+        val newText = newValue.text
+        if (oldText != newText) {
             undoStack.push(_content.value)
             redoStack.clear()
             _saveStatus.value = "Unsaved Changes"
+            _content.value = newValue
+            if (_showSearchReplace.value) {
+                updateSearchResults(_searchQuery.value)
+            }
+        } else {
+            _content.value = newValue
         }
-        _content.value = newValue
     }
 
     fun undo() {
@@ -91,8 +98,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleSearchReplace(isReplace: Boolean = false) {
-        _isReplaceMode.value = isReplace
-        _showSearchReplace.value = !_showSearchReplace.value
+        if (_showSearchReplace.value && _isReplaceMode.value == isReplace) {
+            _showSearchReplace.value = false
+        } else {
+            _showSearchReplace.value = true
+            _isReplaceMode.value = isReplace
+        }
+        
         if (!_showSearchReplace.value) {
             _searchQuery.value = ""
             _searchResults.value = emptyList()
@@ -184,47 +196,21 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun replaceNext() {
-        val text = _content.value.text
         val query = _searchQuery.value
         val replace = _replaceQuery.value
-        if (query.isEmpty()) return
+        if (query.isEmpty() || _searchResults.value.isEmpty() || _currentResultIndex.value == -1) return
 
-        try {
-            val regex = Regex("\\b${Regex.escape(query)}\\b", RegexOption.IGNORE_CASE)
-            // Search starting from current selection end
-            var match = regex.find(text, _content.value.selection.end)
-
-            // Wrap around to start of file if not found
-            if (match == null) {
-                match = regex.find(text, 0)
-            }
-
-            match?.let {
-                val range = it.range
-                val newText = text.replaceRange(range, replace)
-                // Move cursor to the end of the newly replaced text
-                val newCursorPos = range.first + replace.length
-                onContentChange(
-                    _content.value.copy(
-                        text = newText,
-                        selection = androidx.compose.ui.text.TextRange(newCursorPos)
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            // Fallback logic for non-word characters or errors
-            val index = text.indexOf(query, _content.value.selection.end)
-            val finalIndex = if (index != -1) index else text.indexOf(query, 0)
-            
-            if (finalIndex != -1) {
-                val newText = text.replaceRange(finalIndex, finalIndex + query.length, replace)
-                onContentChange(
-                    _content.value.copy(
-                        text = newText,
-                        selection = androidx.compose.ui.text.TextRange(finalIndex + replace.length)
-                    )
-                )
-            }
-        }
+        val text = _content.value.text
+        val range = _searchResults.value[_currentResultIndex.value]
+        
+        val newText = text.replaceRange(range.first, range.last, replace)
+        val newCursorPos = range.first + replace.length
+        
+        onContentChange(
+            _content.value.copy(
+                text = newText,
+                selection = androidx.compose.ui.text.TextRange(newCursorPos)
+            )
+        )
     }
 }

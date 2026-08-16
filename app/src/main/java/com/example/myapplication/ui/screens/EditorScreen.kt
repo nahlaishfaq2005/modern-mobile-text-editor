@@ -3,14 +3,15 @@ package com.example.myapplication.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.*
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,11 +28,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.input.TransformedText
-import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.ui.components.editor.EditorSidebar
-import com.example.myapplication.ui.components.editor.SearchReplaceSheet
 import com.example.myapplication.ui.components.editor.SyntaxHighlighter
 import com.example.myapplication.ui.viewmodel.EditorViewModel
 import com.example.myapplication.ui.viewmodel.HomeViewModel
@@ -43,7 +46,6 @@ fun EditorScreen(
     fileName: String = "MainActivity.kt",
     fileType: String = "Kotlin",
     onNavigateBack: () -> Unit = {},
-    onNavigateToRecentAll: () -> Unit = {},
     onNavigateToVersions: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     viewModel: EditorViewModel = viewModel(),
@@ -61,10 +63,40 @@ fun EditorScreen(
     val recentFiles by homeViewModel.recentFiles.collectAsState()
     
     val focusRequester = remember { FocusRequester() }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scrollState = rememberScrollState()
+    val horizontalScrollState = rememberScrollState()
+    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var viewportHeight by remember { mutableIntStateOf(0) }
     
     LaunchedEffect(showSearchReplace) {
         if (showSearchReplace && !isReplaceMode) {
             focusRequester.requestFocus()
+        }
+    }
+
+    LaunchedEffect(currentIndex, searchResults, viewportHeight, textLayoutResult) {
+        if (currentIndex != -1 && currentIndex < searchResults.size && viewportHeight > 0) {
+            val range = searchResults[currentIndex]
+            textLayoutResult?.let { layout ->
+                try {
+                    val matchRect = layout.getBoundingBox(range.first)
+                    val matchCenterY = matchRect.center.y
+                    
+                    // Create a rect centered on the match with a portion of viewport height to center it
+                    // Using viewportHeight / 2.5f to provide a good "visible context" around the match
+                    val scrollRect = Rect(
+                        left = matchRect.left,
+                        top = matchCenterY - (viewportHeight / 2.5f),
+                        right = matchRect.right,
+                        bottom = matchCenterY + (viewportHeight / 2.5f)
+                    )
+                    
+                    bringIntoViewRequester.bringIntoView(scrollRect)
+                } catch (_: Exception) {
+                    // Ignore if layout is not yet updated for the current content
+                }
+            }
         }
     }
     
@@ -87,7 +119,7 @@ fun EditorScreen(
                 EditorSidebar(
                     recentFiles = recentFiles,
                     activeFileName = fileName,
-                    onFileClick = { file ->
+                    onFileClick = { _ ->
                         scope.launch { drawerState.close() }
                     }
                 )
@@ -108,20 +140,27 @@ fun EditorScreen(
                     EditorToolbar(
                         onUndo = { viewModel.undo() },
                         onRedo = { viewModel.redo() },
+                        onWordWrapToggle = { viewModel.toggleWordWrap() },
+                        isWordWrapEnabled = isWordWrapEnabled,
                         onFormatClick = { /* Format logic */ },
                         onSearchClick = { viewModel.toggleSearchReplace(false) },
                         onReplaceClick = { viewModel.toggleSearchReplace(true) },
                         onSaveClick = { viewModel.saveFile(fileName) }
                     )
                     
-                    if (showSearchReplace && !isReplaceMode) {
-                        EditorSearchBar(
-                            query = searchQuery,
-                            onQueryChange = { viewModel.onSearchQueryChange(it) },
+                        if (showSearchReplace) {
+                        EditorSearchReplacePanel(
+                            isReplaceMode = isReplaceMode,
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
+                            replaceQuery = replaceQuery,
+                            onReplaceQueryChange = { viewModel.onReplaceQueryChange(it) },
                             currentIndex = currentIndex,
                             totalCount = searchResults.size,
                             onNext = { viewModel.nextSearchResult() },
                             onPrevious = { viewModel.previousSearchResult() },
+                            onReplace = { viewModel.replaceNext() },
+                            onReplaceAll = { viewModel.replaceAll() },
                             onClose = { viewModel.toggleSearchReplace(false) },
                             focusRequester = focusRequester
                         )
@@ -130,12 +169,6 @@ fun EditorScreen(
             },
             bottomBar = {
                 Column {
-                    if (showSearchReplace && isReplaceMode) {
-                        // Keep old replace logic for now if it's replace mode, 
-                        // but the user said "Update only the Search UI for now"
-                        // I'll hide the replace UI from bottom bar if it was there?
-                        // Actually replace was a BottomSheet. 
-                    }
                     EditorStatusBar(
                         line = 11,
                         col = 25,
@@ -158,22 +191,34 @@ fun EditorScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 8.dp)
+                    .onGloballyPositioned { viewportHeight = it.size.height }
                     .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.background, RoundedCornerShape(12.dp))
             ) {
                 if (fileType == "Markdown" && isPreviewMode) {
                     MarkdownPreview(content.text)
                 } else {
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        LineNumbers(content.text.lines().size)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
+                    ) {
+                        LineNumbers(content.text.lines().size, textLayoutResult)
                         
                         BasicTextField(
-                            value = content,
-                            onValueChange = { viewModel.onContentChange(it) },
+                            state = rememberTextFieldState(content.text, content.selection),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(12.dp)
-                                .then(if (isWordWrapEnabled) Modifier else Modifier.verticalScroll(rememberScrollState())),
+                                .then(
+                                    if (!isWordWrapEnabled) {
+                                        Modifier.horizontalScroll(horizontalScrollState)
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .bringIntoViewRequester(bringIntoViewRequester),
+                            lineLimits = if (isWordWrapEnabled) TextFieldLineLimits.Default else TextFieldLineLimits.MultiLine(1, Int.MAX_VALUE),
                             textStyle = TextStyle(
                                 color = MaterialTheme.colorScheme.onBackground,
                                 fontFamily = FontFamily.Monospace,
@@ -181,37 +226,34 @@ fun EditorScreen(
                                 lineHeight = 20.sp
                             ),
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            visualTransformation = { text ->
+                            outputTransformation = {
+                                val text = asCharSequence().toString()
                                 val highlighted = if (fileType == "Kotlin") {
-                                    SyntaxHighlighter.highlightKotlin(text.text)
+                                    SyntaxHighlighter.highlightKotlin(text)
                                 } else {
-                                    SyntaxHighlighter.highlightMarkdown(text.text)
+                                    SyntaxHighlighter.highlightMarkdown(text)
                                 }
                                 
-                                val searchHighlighted = buildAnnotatedString {
-                                    append(highlighted)
-                                    if (searchQuery.isNotEmpty()) {
-                                        searchResults.forEachIndexed { index, range ->
-                                            val isCurrent = index == currentIndex
-                                            addStyle(
-                                                SpanStyle(
-                                                    background = if (isCurrent) 
-                                                        Color(0xFFA56F63) // PrimaryAccent for active
-                                                    else 
-                                                        Color(0xFFA56F63).copy(alpha = 0.3f), // Transparent accent for others
-                                                    color = if (isCurrent) Color.White else Color.Unspecified
-                                                ),
-                                                range.first,
-                                                range.last
-                                            )
-                                        }
+                                highlighted.spanStyles.forEach { range ->
+                                    addStyle(range.item, range.start, range.end)
+                                }
+
+                                if (searchQuery.isNotEmpty()) {
+                                    searchResults.forEachIndexed { index, range ->
+                                        val isCurrent = index == currentIndex
+                                        addStyle(
+                                            SpanStyle(
+                                                background = if (isCurrent) 
+                                                    Color(0xFFA56F63) // PrimaryAccent for active
+                                                else 
+                                                    Color(0xFFA56F63).copy(alpha = 0.3f), // Transparent accent for others
+                                                color = if (isCurrent) Color.White else Color.Unspecified
+                                            ),
+                                            range.first,
+                                            range.last + 1
+                                        )
                                     }
                                 }
-                                
-                                TransformedText(
-                                    searchHighlighted,
-                                    OffsetMapping.Identity
-                                )
                             }
                         )
                     }
@@ -279,10 +321,7 @@ fun EditorTopBar(
                         )
                     } else {
                         Icon(
-                            imageVector = when (fileType) {
-                                "Markdown" -> Icons.Default.Description
-                                else -> Icons.AutoMirrored.Filled.Notes
-                            },
+                            imageVector = Icons.AutoMirrored.Filled.Notes,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
@@ -339,7 +378,7 @@ fun EditorTopBar(
                         DropdownMenuItem(
                             text = { Text("Format Code") },
                             onClick = { onMoreMenuToggle(false) },
-                            leadingIcon = { Icon(Icons.Default.FormatAlignLeft, contentDescription = null) }
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.FormatAlignLeft, contentDescription = null) }
                         )
                     }
                     DropdownMenuItem(
@@ -357,6 +396,8 @@ fun EditorTopBar(
 fun EditorToolbar(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    onWordWrapToggle: () -> Unit,
+    isWordWrapEnabled: Boolean,
     onFormatClick: () -> Unit,
     onSearchClick: () -> Unit,
     onReplaceClick: () -> Unit,
@@ -369,16 +410,24 @@ fun EditorToolbar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onUndo) {
-            Icon(Icons.Default.Undo, contentDescription = "Undo", tint = Color.LightGray)
+            Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo", tint = Color.LightGray)
         }
         IconButton(onClick = onRedo) {
-            Icon(Icons.Default.Redo, contentDescription = "Redo", tint = Color.LightGray)
+            Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo", tint = Color.LightGray)
         }
         
-        Spacer(modifier = Modifier.width(24.dp))
+        IconButton(onClick = onWordWrapToggle) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.WrapText,
+                contentDescription = "Word Wrap",
+                tint = if (isWordWrapEnabled) Color(0xFFA56F63) else Color.LightGray
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(16.dp))
         
         IconButton(onClick = onFormatClick) {
-            Icon(Icons.Default.PlaylistAdd, contentDescription = "Format", tint = Color.LightGray)
+            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Format", tint = Color.LightGray)
         }
         
         Spacer(modifier = Modifier.weight(1f))
@@ -404,24 +453,48 @@ fun EditorToolbar(
 }
 
 @Composable
-fun LineNumbers(lineCount: Int) {
+fun LineNumbers(lineCount: Int, textLayoutResult: TextLayoutResult?) {
     Column(
         modifier = Modifier
-            .fillMaxHeight()
             .width(32.dp)
             .padding(top = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        for (i in 1..lineCount) {
-            Text(
-                text = i.toString(),
-                style = TextStyle(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp
-                ),
-                modifier = Modifier.height(20.dp)
-            )
+        if (textLayoutResult == null) {
+            for (i in 1..lineCount) {
+                Text(
+                    text = i.toString(),
+                    style = TextStyle(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp
+                    ),
+                    modifier = Modifier.height(20.dp)
+                )
+            }
+        } else {
+            val text = textLayoutResult.layoutInput.text.text
+            var currentDocLine = 1
+            
+            for (i in 0 until textLayoutResult.lineCount) {
+                val lineStartOffset = textLayoutResult.getLineStart(i)
+                val isNewDocLine = i == 0 || (lineStartOffset > 0 && text[lineStartOffset - 1] == '\n')
+                
+                if (isNewDocLine) {
+                    Text(
+                        text = currentDocLine.toString(),
+                        style = TextStyle(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp
+                        ),
+                        modifier = Modifier.height(20.dp)
+                    )
+                    currentDocLine++
+                } else {
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+            }
         }
     }
 }
@@ -479,13 +552,18 @@ fun EditorStatusBar(line: Int, col: Int, fileType: String, saveStatus: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditorSearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
+fun EditorSearchReplacePanel(
+    isReplaceMode: Boolean,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    replaceQuery: String,
+    onReplaceQueryChange: (String) -> Unit,
     currentIndex: Int,
     totalCount: Int,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
+    onReplace: () -> Unit,
+    onReplaceAll: () -> Unit,
     onClose: () -> Unit,
     focusRequester: FocusRequester
 ) {
@@ -494,101 +572,190 @@ fun EditorSearchBar(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(24.dp), // More rounded like the home search bar
+        shape = RoundedCornerShape(12.dp),
         border = BorderStroke(
             1.dp, 
             MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
         ),
         tonalElevation = 8.dp
     ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
-            )
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = Color.White
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                decorationBox = { innerTextField ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (query.isEmpty()) {
-                            Text(
-                                "Search text...",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = Color.White.copy(alpha = 0.4f)
-                            )
-                        }
-                        innerTextField()
-                    }
-                }
-            )
-            
-            if (query.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 8.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = if (totalCount > 0) "${currentIndex + 1} / $totalCount" else "0 / 0",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPrevious, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        Icons.Default.KeyboardArrowUp, 
-                        contentDescription = "Previous", 
-                        tint = Color.White.copy(alpha = 0.8f)
-                    )
-                }
-                
-                IconButton(onClick = onNext, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        Icons.Default.KeyboardArrowDown, 
-                        contentDescription = "Next", 
-                        tint = Color.White.copy(alpha = 0.8f)
-                    )
-                }
-                
-                VerticalDivider(
-                    modifier = Modifier
-                        .height(20.dp)
-                        .padding(horizontal = 4.dp),
-                    color = Color.White.copy(alpha = 0.2f)
+            // Search Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
                 )
                 
-                IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        Icons.Default.Close, 
-                        contentDescription = "Close", 
-                        tint = MaterialTheme.colorScheme.primary
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = Color.White
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    decorationBox = { innerTextField ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (searchQuery.isEmpty()) {
+                                Text(
+                                    "Search text...",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = Color.White.copy(alpha = 0.4f)
+                                )
+                            }
+                            innerTextField()
+                        }
+                    }
+                )
+                
+                if (searchQuery.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = if (totalCount > 0) "${currentIndex + 1} / $totalCount" else "0 / 0",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onPrevious, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            Icons.Default.KeyboardArrowUp, 
+                            contentDescription = "Previous", 
+                            tint = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
+                    
+                    IconButton(onClick = onNext, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            Icons.Default.KeyboardArrowDown, 
+                            contentDescription = "Next", 
+                            tint = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
+                    
+                    VerticalDivider(
+                        modifier = Modifier
+                            .height(20.dp)
+                            .padding(horizontal = 4.dp),
+                        color = Color.White.copy(alpha = 0.2f)
                     )
+                    
+                    IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            Icons.Default.Close, 
+                            contentDescription = "Close", 
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            if (isReplaceMode) {
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Replace Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    BasicTextField(
+                        value = replaceQuery,
+                        onValueChange = onReplaceQueryChange,
+                        modifier = Modifier.weight(1f),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                            color = Color.White
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        decorationBox = { innerTextField ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (replaceQuery.isEmpty()) {
+                                    Text(
+                                        "Replace with...",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = Color.White.copy(alpha = 0.4f)
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
+                    
+                    IconButton(onClick = { onReplaceQueryChange("") }, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            Icons.Default.HighlightOff, 
+                            contentDescription = "Clear", 
+                            tint = Color.White.copy(alpha = 0.4f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Button Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = onReplace,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(vertical = 12.dp)
+                    ) {
+                        Text("Replace", style = MaterialTheme.typography.labelLarge)
+                    }
+                    
+                    Button(
+                        onClick = onReplaceAll,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFA56F63), // Theme accent color
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(vertical = 12.dp)
+                    ) {
+                        Text("Replace All", style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
         }

@@ -62,7 +62,6 @@ class MainActivity : ComponentActivity() {
                             fileName = name,
                             fileType = type,
                             onNavigateBack = { navController.popBackStack() },
-                            onNavigateToRecentAll = { navController.navigate("recent_all") },
                             onNavigateToVersions = { navController.navigate("versions") },
                             onNavigateToSettings = { navController.navigate("settings") }
                         )

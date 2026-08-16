@@ -50,12 +50,21 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val _saveStatus = MutableStateFlow("Saved")
     val saveStatus: StateFlow<String> = _saveStatus.asStateFlow()
 
+    private val _isReadOnly = MutableStateFlow(false)
+    val isReadOnly: StateFlow<Boolean> = _isReadOnly.asStateFlow()
+
     fun loadFile(fileName: String) {
         val loadedContent = repository.loadFile(fileName)
         _content.value = TextFieldValue(loadedContent)
         undoStack.clear()
         redoStack.clear()
         _saveStatus.value = "Saved"
+        // Reset read-only state when a new file is loaded
+        _isReadOnly.value = false
+    }
+
+    fun toggleReadOnly() {
+        _isReadOnly.value = !_isReadOnly.value
     }
 
     fun saveFile(fileName: String) {

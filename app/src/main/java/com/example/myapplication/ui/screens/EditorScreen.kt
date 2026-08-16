@@ -70,6 +70,7 @@ fun EditorScreen(
     val currentIndex by viewModel.currentResultIndex.collectAsState()
     val replaceQuery by viewModel.replaceQuery.collectAsState()
     val saveStatus by viewModel.saveStatus.collectAsState()
+    val isReadOnly by viewModel.isReadOnly.collectAsState()
     val recentFiles by homeViewModel.recentFiles.collectAsState()
     
     val focusRequester = remember { FocusRequester() }
@@ -146,7 +147,9 @@ fun EditorScreen(
                         showMoreMenu = showMoreMenu,
                         onMoreMenuToggle = { showMoreMenu = it },
                         onSaveClick = { viewModel.saveFile(fileName) },
-                        onFormatClick = { viewModel.formatCode() }
+                        onFormatClick = { viewModel.formatCode() },
+                        isReadOnly = isReadOnly,
+                        onToggleReadOnly = { viewModel.toggleReadOnly() }
                     )
                     EditorToolbar(
                         onUndo = { viewModel.undo() },
@@ -155,9 +158,10 @@ fun EditorScreen(
                         isWordWrapEnabled = isWordWrapEnabled,
                         onFormatClick = { viewModel.formatCode() },
                         onSearchClick = { viewModel.toggleSearchReplace(false) },
-                        onReplaceClick = { viewModel.toggleSearchReplace(true) },
+                        onReplaceClick = { if (!isReadOnly) viewModel.toggleSearchReplace(true) },
                         onSaveClick = { viewModel.saveFile(fileName) },
-                        showFormat = fileType != "Markdown"
+                        showFormat = fileType != "Markdown",
+                        enabled = !isReadOnly
                     )
                     
                         if (showSearchReplace) {
@@ -171,10 +175,11 @@ fun EditorScreen(
                             totalCount = searchResults.size,
                             onNext = { viewModel.nextSearchResult() },
                             onPrevious = { viewModel.previousSearchResult() },
-                            onReplace = { viewModel.replaceNext() },
-                            onReplaceAll = { viewModel.replaceAll() },
+                            onReplace = { if (!isReadOnly) viewModel.replaceNext() },
+                            onReplaceAll = { if (!isReadOnly) viewModel.replaceAll() },
                             onClose = { viewModel.toggleSearchReplace(false) },
-                            focusRequester = focusRequester
+                            focusRequester = focusRequester,
+                            enabled = !isReadOnly
                         )
                     }
 
@@ -221,7 +226,8 @@ fun EditorScreen(
                         line = 11,
                         col = 25,
                         fileType = fileType,
-                        saveStatus = saveStatus
+                        saveStatus = saveStatus,
+                        isReadOnly = isReadOnly
                     )
                     HomeBottomNavigation(
                         currentRoute = "editor",
@@ -286,7 +292,7 @@ fun EditorScreen(
 
                         BasicTextField(
                             value = content,
-                            onValueChange = { viewModel.onContentChange(it) },
+                            onValueChange = { if (!isReadOnly) viewModel.onContentChange(it) },
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(12.dp)
@@ -298,6 +304,7 @@ fun EditorScreen(
                                     }
                                 )
                                 .bringIntoViewRequester(bringIntoViewRequester),
+                            readOnly = isReadOnly,
                             textStyle = TextStyle(
                                 color = MaterialTheme.colorScheme.onBackground,
                                 fontFamily = FontFamily.Monospace,
@@ -325,7 +332,9 @@ fun EditorTopBar(
     showMoreMenu: Boolean,
     onMoreMenuToggle: (Boolean) -> Unit,
     onSaveClick: () -> Unit,
-    onFormatClick: () -> Unit
+    onFormatClick: () -> Unit,
+    isReadOnly: Boolean,
+    onToggleReadOnly: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -387,14 +396,45 @@ fun EditorTopBar(
                 Spacer(modifier = Modifier.width(12.dp))
                 
                 Column {
-                    Text(
-                        text = fileName,
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp
-                        ),
-                        color = Color.White
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = fileName,
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 22.sp
+                            ),
+                            color = Color.White
+                        )
+                        if (isReadOnly) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                color = Color(0xFFA56F63).copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(4.dp),
+                                border = BorderStroke(0.5.dp, Color(0xFFA56F63).copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Lock,
+                                        contentDescription = null,
+                                        tint = Color(0xFFA56F63),
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "Read-Only",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium
+                                        ),
+                                        color = Color(0xFFA56F63)
+                                    )
+                                }
+                            }
+                        }
+                    }
                     Text(
                         text = "$fileType File",
                         style = MaterialTheme.typography.labelSmall,
@@ -440,6 +480,25 @@ fun EditorTopBar(
                         )
                     }
                     DropdownMenuItem(
+                        text = { 
+                            Text(
+                                text = if (isReadOnly) "Make Editable" else "Make Read-Only",
+                                color = if (isReadOnly) Color(0xFF4CAF50) else Color.Unspecified
+                            ) 
+                        },
+                        onClick = { 
+                            onToggleReadOnly()
+                            onMoreMenuToggle(false) 
+                        },
+                        leadingIcon = { 
+                            Icon(
+                                if (isReadOnly) Icons.Default.LockOpen else Icons.Default.Lock, 
+                                contentDescription = null,
+                                tint = if (isReadOnly) Color(0xFF4CAF50) else LocalContentColor.current
+                            ) 
+                        }
+                    )
+                    DropdownMenuItem(
                         text = { Text("Version History") },
                         onClick = { onMoreMenuToggle(false) },
                         leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
@@ -460,7 +519,8 @@ fun EditorToolbar(
     onSearchClick: () -> Unit,
     onReplaceClick: () -> Unit,
     onSaveClick: () -> Unit,
-    showFormat: Boolean = true
+    showFormat: Boolean = true,
+    enabled: Boolean = true
 ) {
     Row(
         modifier = Modifier
@@ -468,11 +528,19 @@ fun EditorToolbar(
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onUndo) {
-            Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo", tint = Color.LightGray)
+        IconButton(onClick = onUndo, enabled = enabled) {
+            Icon(
+                Icons.AutoMirrored.Filled.Undo, 
+                contentDescription = "Undo", 
+                tint = if (enabled) Color.LightGray else Color.DarkGray
+            )
         }
-        IconButton(onClick = onRedo) {
-            Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo", tint = Color.LightGray)
+        IconButton(onClick = onRedo, enabled = enabled) {
+            Icon(
+                Icons.AutoMirrored.Filled.Redo, 
+                contentDescription = "Redo", 
+                tint = if (enabled) Color.LightGray else Color.DarkGray
+            )
         }
         
         IconButton(onClick = onWordWrapToggle) {
@@ -484,23 +552,26 @@ fun EditorToolbar(
         }
 
         if (showFormat) {
-            IconButton(onClick = onFormatClick) {
+            IconButton(onClick = onFormatClick, enabled = enabled) {
                 Icon(
                     imageVector = Icons.Default.DataObject,
                     contentDescription = "Format Code",
-                    tint = Color.LightGray
+                    tint = if (enabled) Color.LightGray else Color.DarkGray
                 )
             }
         }
-
 
         Spacer(modifier = Modifier.weight(1f))
         
         IconButton(onClick = onSearchClick) {
             Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.LightGray)
         }
-        IconButton(onClick = onReplaceClick) {
-            Icon(Icons.Default.SwapHoriz, contentDescription = "Replace", tint = Color.LightGray)
+        IconButton(onClick = onReplaceClick, enabled = enabled) {
+            Icon(
+                Icons.Default.SwapHoriz, 
+                contentDescription = "Replace", 
+                tint = if (enabled) Color.LightGray else Color.DarkGray
+            )
         }
         
         Spacer(modifier = Modifier.width(8.dp))
@@ -564,7 +635,7 @@ fun LineNumbers(lineCount: Int, textLayoutResult: TextLayoutResult?) {
 }
 
 @Composable
-fun EditorStatusBar(line: Int, col: Int, fileType: String, saveStatus: String) {
+fun EditorStatusBar(line: Int, col: Int, fileType: String, saveStatus: String, isReadOnly: Boolean) {
     Surface(
         color = MaterialTheme.colorScheme.background,
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
@@ -576,11 +647,36 @@ fun EditorStatusBar(line: Int, col: Int, fileType: String, saveStatus: String) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Ln $line    Col $col    UTF-8",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isReadOnly) {
+                    Icon(
+                        Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = Color(0xFFA56F63),
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "Read-Only",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = Color(0xFFA56F63)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+//                Text(
+//                    text = "Ln $line    Col $col    UTF-8",
+//                    style = MaterialTheme.typography.labelSmall,
+//                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+//                )
+                Text(
+                    "EDIT MODE",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = Color(0xFFD99B7F)
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = fileType,
@@ -629,7 +725,8 @@ fun EditorSearchReplacePanel(
     onReplace: () -> Unit,
     onReplaceAll: () -> Unit,
     onClose: () -> Unit,
-    focusRequester: FocusRequester
+    focusRequester: FocusRequester,
+    enabled: Boolean = true
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
@@ -797,9 +894,12 @@ fun EditorSearchReplacePanel(
                 ) {
                     Button(
                         onClick = onReplace,
+                        enabled = enabled,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                            contentColor = Color.White
+                            contentColor = Color.White,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f),
+                            disabledContentColor = Color.Gray
                         ),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp),
@@ -810,9 +910,12 @@ fun EditorSearchReplacePanel(
                     
                     Button(
                         onClick = onReplaceAll,
+                        enabled = enabled,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFA56F63), // Theme accent color
-                            contentColor = Color.White
+                            contentColor = Color.White,
+                            disabledContainerColor = Color(0xFFA56F63).copy(alpha = 0.1f),
+                            disabledContentColor = Color.Gray
                         ),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp),

@@ -8,7 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.input.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -33,6 +34,10 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.ui.components.editor.EditorSidebar
 import com.example.myapplication.ui.components.editor.SyntaxHighlighter
@@ -205,8 +210,40 @@ fun EditorScreen(
                     ) {
                         LineNumbers(content.text.lines().size, textLayoutResult)
                         
+                        val visualTransformation = remember(fileType, searchQuery, searchResults, currentIndex) {
+                            VisualTransformation { text ->
+                                val highlighted = if (fileType == "Kotlin") {
+                                    SyntaxHighlighter.highlightKotlin(text.text)
+                                } else {
+                                    SyntaxHighlighter.highlightMarkdown(text.text)
+                                }
+                                
+                                val searchHighlighted = buildAnnotatedString {
+                                    append(highlighted)
+                                    if (searchQuery.isNotEmpty()) {
+                                        searchResults.forEachIndexed { index, range ->
+                                            val isCurrent = index == currentIndex
+                                            addStyle(
+                                                SpanStyle(
+                                                    background = if (isCurrent) 
+                                                        Color(0xFFA56F63) // PrimaryAccent for active
+                                                    else 
+                                                        Color(0xFFA56F63).copy(alpha = 0.3f), // Transparent accent for others
+                                                    color = if (isCurrent) Color.White else Color.Unspecified
+                                                ),
+                                                range.first,
+                                                range.last
+                                            )
+                                        }
+                                    }
+                                }
+                                TransformedText(searchHighlighted, OffsetMapping.Identity)
+                            }
+                        }
+
                         BasicTextField(
-                            state = rememberTextFieldState(content.text, content.selection),
+                            value = content,
+                            onValueChange = { viewModel.onContentChange(it) },
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(12.dp)
@@ -218,7 +255,6 @@ fun EditorScreen(
                                     }
                                 )
                                 .bringIntoViewRequester(bringIntoViewRequester),
-                            lineLimits = if (isWordWrapEnabled) TextFieldLineLimits.Default else TextFieldLineLimits.MultiLine(1, Int.MAX_VALUE),
                             textStyle = TextStyle(
                                 color = MaterialTheme.colorScheme.onBackground,
                                 fontFamily = FontFamily.Monospace,
@@ -226,35 +262,10 @@ fun EditorScreen(
                                 lineHeight = 20.sp
                             ),
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            outputTransformation = {
-                                val text = asCharSequence().toString()
-                                val highlighted = if (fileType == "Kotlin") {
-                                    SyntaxHighlighter.highlightKotlin(text)
-                                } else {
-                                    SyntaxHighlighter.highlightMarkdown(text)
-                                }
-                                
-                                highlighted.spanStyles.forEach { range ->
-                                    addStyle(range.item, range.start, range.end)
-                                }
-
-                                if (searchQuery.isNotEmpty()) {
-                                    searchResults.forEachIndexed { index, range ->
-                                        val isCurrent = index == currentIndex
-                                        addStyle(
-                                            SpanStyle(
-                                                background = if (isCurrent) 
-                                                    Color(0xFFA56F63) // PrimaryAccent for active
-                                                else 
-                                                    Color(0xFFA56F63).copy(alpha = 0.3f), // Transparent accent for others
-                                                color = if (isCurrent) Color.White else Color.Unspecified
-                                            ),
-                                            range.first,
-                                            range.last + 1
-                                        )
-                                    }
-                                }
-                            }
+                            visualTransformation = visualTransformation,
+                            onTextLayout = { textLayoutResult = it },
+                            singleLine = false,
+                            maxLines = if (isWordWrapEnabled) Int.MAX_VALUE else Int.MAX_VALUE // maxLines doesn't control wrapping, Modifier.horizontalScroll does
                         )
                     }
                 }
@@ -424,12 +435,6 @@ fun EditorToolbar(
             )
         }
 
-        
-
-//
-//        IconButton(onClick = onFormatClick) {
-//            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Format", tint = Color.LightGray)
-//        }
         IconButton(onClick = onFormatClick) {
             Icon(
                 imageVector = Icons.Default.DataObject,

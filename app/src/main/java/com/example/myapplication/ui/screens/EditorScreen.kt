@@ -651,14 +651,14 @@ fun EditorStatusBar(line: Int, col: Int, fileType: String, saveStatus: String, i
                 Icon(
                     imageVector = if (isReadOnly) Icons.Default.Lock else Icons.Default.LockOpen,
                     contentDescription = null,
-                    tint = if (isReadOnly) Color(0xFFA56F63) else Color(0xFF4CAF50),
+                    tint = if (isReadOnly) Color(0xFFA56F63) else Color(0xFF64B5F6),
                     modifier = Modifier.size(12.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = if (isReadOnly) "Read-Only" else "Editable",
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = if (isReadOnly) Color(0xFFA56F63) else Color(0xFF4CAF50)
+                    color = if (isReadOnly) Color(0xFFA56F63) else Color(0xFF64B5F6)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
 //                Text(

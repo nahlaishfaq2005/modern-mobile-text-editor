@@ -22,8 +22,8 @@ class VersionManager(
             ""
         }
 
-        // Task 25: Prevent duplicate versions (Only for auto-saves)
-        if (isAutoSaved && latestVersion != null && content == previousContent) {
+        // Task 25: Prevent duplicate versions
+        if (latestVersion != null && content == previousContent) {
             return VersionResult.Duplicate
         }
 

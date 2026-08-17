@@ -38,6 +38,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val _content = mutableStateOf(TextFieldValue(""))
     val content: State<TextFieldValue> = _content
     
+    private var lastSavedContent: String = "" // Track content to avoid redundant saves and versions
+    
     // UI state for Save As dialog
     private val _showSaveAsDialog = MutableStateFlow(false)
     val showSaveAsDialog: StateFlow<Boolean> = _showSaveAsDialog.asStateFlow()
@@ -104,6 +106,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private fun loadNormalFile(fileName: String) {
         val loadedContent = repository.loadFile(fileName)
         _content.value = TextFieldValue(loadedContent)
+        lastSavedContent = loadedContent
         undoStack.clear()
         redoStack.clear()
         _saveStatus.value = "Saved"
@@ -137,11 +140,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private fun cacheCurrentFile() {
         if (_currentFileName.value.isNotEmpty()) {
             val isModified = _saveStatus.value == "Unsaved Changes" || _saveStatus.value == "Recovered"
-            recoveryManager.cacheActiveFile(
-                fileName = _currentFileName.value,
-                content = _content.value.text,
-                isModified = isModified
-            )
+            if (isModified) {
+                recoveryManager.cacheActiveFile(
+                    fileName = _currentFileName.value,
+                    content = _content.value.text,
+                    isModified = isModified
+                )
+            }
         }
     }
 
@@ -155,9 +160,15 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
+        // If no changes, skip saving and version creation
+        if (_saveStatus.value == "Saved") {
+            return
+        }
+
         val success = repository.saveFile(fileName, _content.value.text)
         if (success) {
             _saveStatus.value = "Saved"
+            lastSavedContent = _content.value.text
             // Task 19: Delete recovery file after successful save
             recoveryManager.deleteRecoveryFile(fileName)
             
@@ -195,10 +206,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             // Update active file state
             _currentFileName.value = newName
             _saveStatus.value = "Saved"
+            lastSavedContent = _content.value.text
             
             // Task 4: Add the new name to recent files
             val type = getFileTypeFromName(newName)
             recentFileRepository.addRecentFile(newName, type, newName)
+            
+            // Create initial version for the new file
+            createVersion(newName, "Initial version (Save As)", false)
             
             // Reset recovery tracking for the new filename
             startRecoveryJob()
@@ -364,7 +379,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         if (_content.value.text != newValue.text) {
             undoStack.push(_content.value)
             redoStack.clear()
-            _saveStatus.value = "Unsaved Changes"
+            
+            // Check if it matches last saved state
+            if (newValue.text == lastSavedContent) {
+                _saveStatus.value = "Saved"
+            } else {
+                _saveStatus.value = "Unsaved Changes"
+            }
         }
         _content.value = newValue
     }
@@ -410,16 +431,28 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun undo() {
         if (undoStack.isNotEmpty()) {
             redoStack.push(_content.value)
-            _content.value = undoStack.pop()
-            _saveStatus.value = "Unsaved Changes"
+            val popped = undoStack.pop()
+            _content.value = popped
+            
+            if (popped.text == lastSavedContent) {
+                _saveStatus.value = "Saved"
+            } else {
+                _saveStatus.value = "Unsaved Changes"
+            }
         }
     }
 
     fun redo() {
         if (redoStack.isNotEmpty()) {
             undoStack.push(_content.value)
-            _content.value = redoStack.pop()
-            _saveStatus.value = "Unsaved Changes"
+            val popped = redoStack.pop()
+            _content.value = popped
+            
+            if (popped.text == lastSavedContent) {
+                _saveStatus.value = "Saved"
+            } else {
+                _saveStatus.value = "Unsaved Changes"
+            }
         }
     }
 

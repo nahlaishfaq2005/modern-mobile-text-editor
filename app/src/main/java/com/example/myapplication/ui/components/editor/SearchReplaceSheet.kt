@@ -105,8 +105,7 @@ fun SearchReplaceSheet(
             }
         }
 
-        // Navigation (Next/Previous) - Always visible or just for search? 
-        // Typically useful for both.
+        // Navigation (Next/Previous)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -118,7 +117,7 @@ fun SearchReplaceSheet(
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(
-                onClick = { /* Previous logic if added to VM */ },
+                onClick = { /* Previous logic */ },
                 contentPadding = PaddingValues(horizontal = 12.dp)
             ) {
                 Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -132,7 +131,7 @@ fun SearchReplaceSheet(
             )
 
             TextButton(
-                onClick = onReplaceNext, // Using ReplaceNext as "Find Next"
+                onClick = onReplaceNext,
                 contentPadding = PaddingValues(horizontal = 12.dp)
             ) {
                 Text("Next", fontSize = 14.sp)
@@ -181,8 +180,8 @@ fun SearchField(value: String, onValueChange: (String) -> Unit, placeholder: Str
             }
         },
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color(0xFF2D323E),
-            unfocusedContainerColor = Color(0xFF2D323E),
+            focusedContainerColor = Color(0xFF1C3F50),
+            unfocusedContainerColor = Color(0xFF1C3F50),
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
             focusedTextColor = Color.White,

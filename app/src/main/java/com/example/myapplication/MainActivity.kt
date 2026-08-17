@@ -87,7 +87,8 @@ class MainActivity : ComponentActivity() {
                                 navController.navigate("editor/$newName/$newType")
                             },
                             onNavigateToVersions = { navController.navigate("versions") },
-                            onNavigateToSettings = { navController.navigate("settings") }
+                            onNavigateToSettings = { navController.navigate("settings") },
+                            settingsViewModel = settingsViewModel
                         )
                     }
                     composable("recent_all") {
@@ -209,7 +210,8 @@ class MainActivity : ComponentActivity() {
                             },
                             onNavigateToVersions = {
                                 navController.navigate("versions")
-                            }
+                            },
+                            viewModel = settingsViewModel
                         )
                     }
                 }

@@ -21,6 +21,9 @@ import com.example.myapplication.ui.viewmodel.HomeViewModel
 fun RecentFilesScreen(
     onNavigateBack: () -> Unit = {},
     onNavigateToEditor: (String, String) -> Unit = { _, _ -> },
+    onNavigateToHome: () -> Unit = {},
+    onNavigateToVersions: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val recentFiles by viewModel.recentFiles.collectAsState()
@@ -45,6 +48,15 @@ fun RecentFilesScreen(
                     containerColor = Color.Transparent,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
+            )
+        },
+        bottomBar = {
+            HomeBottomNavigation(
+                currentRoute = "editor",
+                onHomeClick = onNavigateToHome,
+                onEditorClick = { /* Already in recent files */ },
+                onVersionsClick = onNavigateToVersions,
+                onSettingsClick = onNavigateToSettings
             )
         },
         containerColor = MaterialTheme.colorScheme.background

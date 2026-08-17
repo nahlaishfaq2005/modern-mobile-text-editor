@@ -44,6 +44,8 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     var showFontSizeDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showFontFamilyDialog by remember { mutableStateOf(false) }
+    var showAutosaveDialog by remember { mutableStateOf(false) }
 
     if (showThemeDialog) {
         AlertDialog(
@@ -72,6 +74,74 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showThemeDialog = false }) {
+                    Text("Close")
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface
+        )
+    }
+
+    if (showFontFamilyDialog) {
+        AlertDialog(
+            onDismissRequest = { showFontFamilyDialog = false },
+            title = { Text("Select Font Family") },
+            text = {
+                Column {
+                    listOf("JetBrains Mono", "Roboto Mono", "Source Code Pro").forEach { family ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setFontFamily(family)
+                                    showFontFamilyDialog = false
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = fontFamily == family, onClick = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(family, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showFontFamilyDialog = false }) {
+                    Text("Close")
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface
+        )
+    }
+
+    if (showAutosaveDialog) {
+        AlertDialog(
+            onDismissRequest = { showAutosaveDialog = false },
+            title = { Text("Autosave Interval") },
+            text = {
+                Column {
+                    listOf(5L, 10L, 30L, 60L).forEach { interval ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setAutosaveInterval(interval)
+                                    showAutosaveDialog = false
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = autosaveInterval == interval, onClick = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("$interval seconds", color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAutosaveDialog = false }) {
                     Text("Close")
                 }
             },
@@ -125,17 +195,17 @@ fun SettingsScreen(
                     Text(
                         "Settings",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
-                    titleContentColor = Color.White
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         },
@@ -176,7 +246,7 @@ fun SettingsScreen(
             SettingsItem(
                 title = "Editor Font",
                 value = fontFamily,
-                onClick = { scope.launch { snackbarHostState.showSnackbar("Font selection not implemented") } }
+                onClick = { showFontFamilyDialog = true }
             )
             
             Row(
@@ -186,41 +256,36 @@ fun SettingsScreen(
                     .clickable { 
                         val newVal = !isWordWrapEnabled
                         viewModel.setWordWrap(newVal)
-                        scope.launch { snackbarHostState.showSnackbar("Word Wrap ${if (newVal) "Enabled" else "Disabled"}") }
                     },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Word Wrap", color = Color.White)
+                Text("Word Wrap", color = MaterialTheme.colorScheme.onSurface)
                 Switch(
                     checked = isWordWrapEnabled,
-                    onCheckedChange = { viewModel.setWordWrap(it) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                    )
+                    onCheckedChange = { viewModel.setWordWrap(it) }
                 )
             }
 
             SettingsItem(
                 title = "Autosave Interval",
                 value = "$autosaveInterval seconds",
-                onClick = { scope.launch { snackbarHostState.showSnackbar("Interval selection not implemented") } }
+                onClick = { showAutosaveDialog = true }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             SettingsSection(title = "Storage")
             Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                Text("Storage Usage", color = Color.Gray, fontSize = 14.sp)
+                Text("Storage Usage", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
                     progress = { 0.24f },
                     modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
                     color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.DarkGray
+                    trackColor = MaterialTheme.colorScheme.outlineVariant
                 )
-                Text("2.45 GB / 10 GB", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                Text("2.45 MB / 100 MB", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }

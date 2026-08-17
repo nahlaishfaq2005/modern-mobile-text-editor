@@ -59,9 +59,6 @@ fun VersionDocumentsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Search is handled by the TextField below */ }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurface)
-                    }
                     Box {
                         IconButton(onClick = { showMenu = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.onSurface)
@@ -105,20 +102,12 @@ fun VersionDocumentsScreen(
                 .padding(padding)
         ) {
             // Search Bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                placeholder = { Text("Search files...", color = Color.Gray) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color.DarkGray,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary
+            Box(modifier = Modifier.padding(16.dp)) {
+                SearchBar(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it }
                 )
-            )
+            }
 
             val filteredFiles = if (searchQuery.isEmpty()) {
                 filesWithVersions

@@ -516,10 +516,6 @@ fun EditorToolbar(
         
         Spacer(modifier = Modifier.width(24.dp))
         
-        IconButton(onClick = onFormatClick) {
-            Icon(Icons.Default.PlaylistAdd, contentDescription = "Format", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        
         if (fileType == "Markdown") {
             IconButton(onClick = onTogglePreview) {
                 Icon(

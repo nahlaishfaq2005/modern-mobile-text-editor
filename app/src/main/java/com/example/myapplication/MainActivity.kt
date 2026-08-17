@@ -95,6 +95,17 @@ class MainActivity : ComponentActivity() {
                             onNavigateBack = { navController.popBackStack() },
                             onNavigateToEditor = { name, type ->
                                 navController.navigate("editor/$name/$type")
+                            },
+                            onNavigateToHome = {
+                                navController.navigate("home") {
+                                    popUpTo("home") { inclusive = true }
+                                }
+                            },
+                            onNavigateToVersions = {
+                                navController.navigate("versions")
+                            },
+                            onNavigateToSettings = {
+                                navController.navigate("settings")
                             }
                         )
                     }

@@ -467,7 +467,7 @@ fun RecentFileCard(file: RecentFile, onClick: () -> Unit, onDelete: () -> Unit =
                 Icon(
                     Icons.Default.DeleteOutline,
                     contentDescription = "Delete",
-                    tint = Color.Red.copy(alpha = 0.7f),
+                    tint = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier.size(20.dp)
                 )
             }

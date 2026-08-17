@@ -186,22 +186,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
-        val success = repository.saveFile(fileName, _content.value.text)
-        if (success) {
-            _saveStatus.value = "Saved"
-            lastSavedContent = _content.value.text
-            // Task 19: Delete recovery file after successful save
-            recoveryManager.deleteRecoveryFile(fileName)
-            
-            // Task 23: Create a manually saved version
-            createVersion(fileName, "Manually saved", false)
-            
-            // Task 4: Update recent files
-            val type = getFileTypeFromName(fileName)
-            recentFileRepository.addRecentFile(fileName, type, fileName)
-        } else {
-            _saveStatus.value = "Error Saving"
-        }
+        // Now createVersion handles physical save, recovery cleanup, and status updates
+        createVersion(fileName, "Manually saved", false)
     }
 
     /**
@@ -258,7 +244,26 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun createVersion(fileName: String, name: String? = null, isAutoSaved: Boolean = false) {
         viewModelScope.launch {
-            val result = versionManager.createVersion(fileName, _content.value.text, name, isAutoSaved)
+            val currentText = _content.value.text
+            val result = versionManager.createVersion(fileName, currentText, name, isAutoSaved)
+            
+            // If it's a manual/named version (not autosave), we must ensure the physical file 
+            // is synced and recovery cache is cleared, even if the version was a duplicate.
+            if (!isAutoSaved) {
+                val success = repository.saveFile(fileName, currentText)
+                if (success) {
+                    _saveStatus.value = "Saved"
+                    lastSavedContent = currentText
+                    recoveryManager.deleteRecoveryFile(fileName)
+                    
+                    // Update recent files
+                    val type = getFileTypeFromName(fileName)
+                    recentFileRepository.addRecentFile(fileName, type, fileName)
+                } else {
+                    _saveStatus.value = "Error Saving"
+                }
+            }
+
             if (result is VersionManager.VersionResult.Success) {
                 loadVersions()
                 loadFilesWithVersions()

@@ -437,11 +437,12 @@ fun VersionItem(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    val titleText = if (!version.name.isNullOrEmpty()) version.name!! else "Version ${version.versionNumber}"
                     Text(
-                        text = "Version ${version.versionNumber}",
+                        text = titleText,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = if (!version.name.isNullOrEmpty()) Color(0xFFE3A487) else MaterialTheme.colorScheme.onSurface
                         )
                     )
                     if (isCurrent) {
@@ -460,11 +461,20 @@ fun VersionItem(
                     }
                 }
                 
-                Text(
-                    text = "Today, $timeString • 2.4 KB",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!version.name.isNullOrEmpty()) {
+                        Text(
+                            text = "Version ${version.versionNumber} • ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                    Text(
+                        text = "Today, $timeString",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 
                 if (restoredFromVersion != null) {
                     Text(
@@ -482,12 +492,12 @@ fun VersionItem(
                     )
                 }
 
-                if (!version.name.isNullOrEmpty() || version.isAutoSaved) {
+                if (version.name.isNullOrEmpty() && version.isAutoSaved) {
                     Text(
-                        text = version.name ?: "Auto-saved",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(top = 4.dp)
+                        text = "Auto-saved",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
             }

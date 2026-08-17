@@ -402,7 +402,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     companion object {
-        private const val RECOVERY_INTERVAL = 10_000L
+        private const val RECOVERY_INTERVAL = 1_000L
     }
 
     fun undo() {

@@ -48,13 +48,13 @@ private val LightColorScheme = lightColorScheme(
     onSecondaryContainer = Color.White,
     tertiary = SecondaryAccent,
     onTertiary = Color.White,
-    background = PrimaryBackground,
-    onBackground = Color.White,
-    surface = SecondarySurface,
-    onSurface = Color.White,
-    surfaceVariant = SecondarySurface,
-    onSurfaceVariant = TextSecondary,
-    outline = SecondaryAccent
+    background = Color.White,
+    onBackground = Color.Black,
+    surface = Color.White,
+    onSurface = Color.Black,
+    surfaceVariant = Color(0xFFF5F5F5),
+    onSurfaceVariant = Color.DarkGray,
+    outline = Color.LightGray
 )
 
 @Composable

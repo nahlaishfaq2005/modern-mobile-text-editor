@@ -24,7 +24,9 @@ fun SaveAsDialog(
     onDismiss: () -> Unit,
     onSave: (String) -> Unit
 ) {
-    var fileName by remember { mutableStateOf(initialName) }
+    // Extract the extension from the initial name (e.g., "MainActivity.kt" -> "kt")
+    val extension = initialName.substringAfterLast(".", "kt")
+    var fileNameBody by remember { mutableStateOf(initialName.substringBeforeLast(".")) }
     var selectedLocation by remember { mutableStateOf("MyCode") }
     var selectedEncoding by remember { mutableStateOf("UTF-8") }
 
@@ -92,9 +94,18 @@ fun SaveAsDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = fileName,
-                    onValueChange = { fileName = it },
+                    value = fileNameBody,
+                    onValueChange = { 
+                        fileNameBody = it.substringBefore(".")
+                    },
                     modifier = Modifier.fillMaxWidth(),
+                    suffix = {
+                        Text(
+                            text = ".$extension",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
                     textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -127,7 +138,11 @@ fun SaveAsDialog(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Button(
-                        onClick = { onSave(fileName) },
+                        onClick = { 
+                            if (fileNameBody.isNotBlank()) {
+                                onSave("$fileNameBody.$extension")
+                            }
+                        },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFE3A487),
                             contentColor = Color.Black

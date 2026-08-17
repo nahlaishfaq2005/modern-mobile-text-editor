@@ -46,7 +46,7 @@ fun NewFileDialog(
     onCreate: (String, String) -> Unit
 ) {
     var selectedType by remember { mutableStateOf(initialType) }
-    var fileName by remember { mutableStateOf("Untitled.${initialType.extension}") }
+    var fileNameBody by remember { mutableStateOf("Untitled") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -66,7 +66,6 @@ fun NewFileDialog(
                     .fillMaxWidth()
             ) {
                 // Header
-
                 Text(
                     text = "New File",
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
@@ -86,12 +85,7 @@ fun NewFileDialog(
                     FileTypeOption(
                         type = type,
                         isSelected = selectedType == type,
-                        onClick = {
-                            selectedType = type
-                            // Update extension while keeping the name part
-                            val nameWithoutExt = fileName.substringBeforeLast(".")
-                            fileName = "$nameWithoutExt.${type.extension}"
-                        }
+                        onClick = { selectedType = type }
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -107,11 +101,21 @@ fun NewFileDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 TextField(
-                    value = fileName,
-                    onValueChange = { fileName = it },
+                    value = fileNameBody,
+                    onValueChange = { 
+                        // Strip any dots if the user tries to type them
+                        fileNameBody = it.substringBefore(".") 
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp)),
+                    suffix = {
+                        Text(
+                            text = ".${selectedType.extension}",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.background,
                         unfocusedContainerColor = MaterialTheme.colorScheme.background,
@@ -140,13 +144,14 @@ fun NewFileDialog(
                     }
                     Button(
                         onClick = {
-                            if (fileName.isNotBlank()) {
+                            if (fileNameBody.isNotBlank()) {
+                                val finalName = "$fileNameBody.${selectedType.extension}"
                                 val typeString = when(selectedType) {
                                     FileType.Kotlin -> "Kotlin"
                                     FileType.Markdown -> "Markdown"
                                     FileType.PlainText -> "Plain Text"
                                 }
-                                onCreate(fileName, typeString)
+                                onCreate(finalName, typeString)
                             }
                         },
                         modifier = Modifier.weight(1f),

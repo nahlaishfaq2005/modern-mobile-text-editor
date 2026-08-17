@@ -179,26 +179,28 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun saveFileAs(newName: String): Boolean {
         if (newName.isBlank()) return false
         
-        // Task 5: Handle duplicate filename
-        // In a full implementation, we'd show a confirmation dialog. 
-        // For now, we allow the save but we could add a check here if needed.
-        
+        val oldName = _currentFileName.value
         val success = repository.saveFile(newName, _content.value.text)
+        
         if (success) {
-            // Task 19: Handle recovery for the old file if any
-            if (_currentFileName.value.isNotEmpty()) {
-                recoveryManager.deleteRecoveryFile(_currentFileName.value)
+            // If there was an old file and the name has changed, delete the old one
+            if (oldName.isNotEmpty() && oldName != newName) {
+                repository.deleteFile(oldName)
+                recoveryManager.deleteRecoveryFile(oldName)
+                
+                // Remove the old file from recent files so it doesn't show up as a duplicate
+                recentFileRepository.removeRecentFile(oldName)
             }
             
-            // Update active file
+            // Update active file state
             _currentFileName.value = newName
             _saveStatus.value = "Saved"
             
-            // Task 4: Update recent files
+            // Task 4: Add the new name to recent files
             val type = getFileTypeFromName(newName)
             recentFileRepository.addRecentFile(newName, type, newName)
             
-            // Reset recovery job for the new file
+            // Reset recovery tracking for the new filename
             startRecoveryJob()
             
             return true

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.data.RecentFile
 import com.example.myapplication.ui.viewmodel.HomeViewModel
+import java.util.Calendar
 
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.myapplication.ui.theme.MyApplicationTheme
@@ -52,18 +54,48 @@ fun HomeScreen(
 ) {
     val recentFiles by viewModel.recentFiles.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val lastOpenedFile by viewModel.lastOpenedFile.collectAsState()
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
-            viewModel.addRecentFile(it.path?.substringAfterLast("/") ?: "Unknown", "Unknown", it.toString())
-            onNavigateToEditor(it.path?.substringAfterLast("/") ?: "Unknown", "Unknown")
+            val name = it.path?.substringAfterLast("/") ?: "Unknown"
+            viewModel.addRecentFile(name, "Unknown", it.toString())
+            onNavigateToEditor(name, "Unknown")
         }
     }
 
     var showNewFileDialog by remember { mutableStateOf(false) }
     var dialogInitialType by remember { mutableStateOf(FileType.Kotlin) }
+    var fileToDelete by remember { mutableStateOf<RecentFile?>(null) }
+
+    if (fileToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { fileToDelete = null },
+            title = { Text("Delete File?") },
+            text = { Text("Are you sure you want to delete '${fileToDelete?.name}'? This will also remove all its version history.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteFile(fileToDelete!!)
+                        fileToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { fileToDelete = null }) {
+                    Text("Cancel", color = Color.White)
+                }
+            },
+            containerColor = Color(0xFF1E1E1E),
+            titleContentColor = Color.White,
+            textContentColor = Color.Gray
+        )
+    }
 
     if (showNewFileDialog) {
         NewFileDialog(
@@ -82,7 +114,11 @@ fun HomeScreen(
             HomeBottomNavigation(
                 currentRoute = "home",
                 onHomeClick = { },
-                onEditorClick = onNavigateToRecentAll,
+                onEditorClick = {
+                    lastOpenedFile?.let {
+                        onNavigateToEditor(it.name, it.type)
+                    } ?: onNavigateToRecentAll()
+                },
                 onVersionsClick = onNavigateToVersions,
                 onSettingsClick = onNavigateToSettings
             )
@@ -150,7 +186,11 @@ fun HomeScreen(
             items(recentFiles) { file ->
                 RecentFileCard(
                     file = file,
-                    onClick = { onNavigateToEditor(file.name, file.type) }
+                    onClick = { 
+                        viewModel.setLastOpenedFile(file)
+                        onNavigateToEditor(file.name, file.type) 
+                    },
+                    onDelete = { fileToDelete = file }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -164,6 +204,15 @@ fun HomeScreen(
 
 @Composable
 fun HomeHeader(onSettingsClick: () -> Unit) {
+    val greeting = remember {
+        val calendar = Calendar.getInstance()
+        when (calendar.get(Calendar.HOUR_OF_DAY)) {
+            in 0..11 -> "Good Morning,"
+            in 12..16 -> "Good Afternoon,"
+            else -> "Good Evening,"
+        }
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -171,7 +220,7 @@ fun HomeHeader(onSettingsClick: () -> Unit) {
     ) {
         Column {
             Text(
-                text = "Good Evening,",
+                text = greeting,
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 28.sp
@@ -365,7 +414,7 @@ fun QuickActionCard(
 }
 
 @Composable
-fun RecentFileCard(file: RecentFile, onClick: () -> Unit) {
+fun RecentFileCard(file: RecentFile, onClick: () -> Unit, onDelete: () -> Unit = {}) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -381,29 +430,45 @@ fun RecentFileCard(file: RecentFile, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
-                Text(
-                    text = file.name,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${file.type} \u00B7 ${file.lastEdited}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = when (file.type) {
+                            "Kotlin" -> Icons.Default.Code
+                            "Markdown" -> Icons.Default.Description
+                            else -> Icons.AutoMirrored.Filled.Notes
+                        },
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = file.name,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${file.type} \u00B7 ${file.lastEdited}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
             }
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = file.type,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Default.DeleteOutline,
+                    contentDescription = "Delete",
+                    tint = Color.Red.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

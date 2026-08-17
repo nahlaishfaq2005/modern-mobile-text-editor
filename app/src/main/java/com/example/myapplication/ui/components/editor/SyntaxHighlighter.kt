@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 
@@ -73,7 +74,7 @@ object SyntaxHighlighter {
     fun highlightMarkdown(text: String): AnnotatedString {
         return buildAnnotatedString {
             val regex = Regex(
-                "(^#+.*$)|(\\*\\*.*?\\*\\*)|(\\*.*?\\*)|(\\[.*?\\]\\(.*?\\))|(^\\s*[-*+]\\s+.*$)",
+                "(^#+.*$)|(\\*\\*.*?\\*\\*)|(\\*.*?\\*)|(\\[.*?\\]\\(.*?\\))|(^\\s*[-*+]\\s+.*$)|(`.*?`)",
                 RegexOption.MULTILINE
             )
             
@@ -94,6 +95,9 @@ object SyntaxHighlighter {
                     }
                     matchText.startsWith("[") -> {
                         withStyle(SpanStyle(color = colors.type)) { append(matchText) }
+                    }
+                    matchText.startsWith("`") -> {
+                        withStyle(SpanStyle(color = colors.string, fontFamily = FontFamily.Monospace)) { append(matchText) }
                     }
                     matchText.trim().startsWith("-") || matchText.trim().startsWith("*") || matchText.trim().startsWith("+") -> {
                         withStyle(SpanStyle(color = colors.annotation)) { append(matchText) }

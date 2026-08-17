@@ -3,14 +3,20 @@ package com.example.myapplication.data
 import android.content.Context
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.charset.StandardCharsets
 
 class FileRepository(private val context: Context) {
 
+    /**
+     * Saves the content to the specified file using UTF-8 encoding.
+     * Task 4 & 5 Requirement: Use UTF-8 and handle English, Numbers, Symbols, Unicode (Sinhala etc.)
+     */
     fun saveFile(fileName: String, content: String): Boolean {
         return try {
             val file = File(context.filesDir, fileName)
             val outputStream = FileOutputStream(file)
-            outputStream.write(content.toByteArray())
+            // Use UTF-8 explicitly to handle all Unicode characters
+            outputStream.write(content.toByteArray(StandardCharsets.UTF_8))
             outputStream.close()
             true
         } catch (e: Exception) {
@@ -19,11 +25,15 @@ class FileRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Loads the content of a file.
+     */
     fun loadFile(fileName: String): String {
         return try {
             val file = File(context.filesDir, fileName)
             if (!file.exists()) return ""
-            file.readText()
+            // readText defaults to UTF-8
+            file.readText(StandardCharsets.UTF_8)
         } catch (e: Exception) {
             e.printStackTrace()
             ""
@@ -61,6 +71,31 @@ class FileRepository(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
             null
+        }
+    }
+
+    /**
+     * Checks if a file with the given name already exists.
+     * Useful for Save As validation.
+     */
+    fun fileExists(fileName: String): Boolean {
+        return File(context.filesDir, fileName).exists()
+    }
+
+    /**
+     * Deletes the specified file.
+     */
+    fun deleteFile(fileName: String): Boolean {
+        return try {
+            val file = File(context.filesDir, fileName)
+            if (file.exists()) {
+                file.delete()
+            } else {
+                true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 }

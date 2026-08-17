@@ -38,4 +38,11 @@ class RecentFileRepository(context: Context) {
         _recentFiles.value = finalList
         saveFiles(finalList)
     }
+
+    fun removeRecentFile(name: String) {
+        val newList = _recentFiles.value.toMutableList()
+        newList.removeAll { it.name == name }
+        _recentFiles.value = newList
+        saveFiles(newList)
+    }
 }

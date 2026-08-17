@@ -56,11 +56,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.gson)
+    implementation(libs.java.diff.utils)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-    implementation(libs.javaDiffUtils)
 
     testImplementation(libs.junit)
 

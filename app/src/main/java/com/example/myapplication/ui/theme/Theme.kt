@@ -37,7 +37,7 @@ private val DarkColorScheme = darkColorScheme(
     onError = Color.White
 )
 
-private val LightColorScheme = darkColorScheme(
+private val LightColorScheme = lightColorScheme(
     primary = PrimaryAccent,
     onPrimary = Color.White,
     primaryContainer = PrimaryAccent,

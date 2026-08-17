@@ -88,7 +88,7 @@ fun SettingsScreen(
             title = { Text("Select Font Family") },
             text = {
                 Column {
-                    listOf("JetBrains Mono", "Roboto Mono", "Source Code Pro").forEach { family ->
+                    listOf("Monospace", "Sans Serif", "Serif").forEach { family ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

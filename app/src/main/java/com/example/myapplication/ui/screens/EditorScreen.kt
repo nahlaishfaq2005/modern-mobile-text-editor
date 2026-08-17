@@ -2,6 +2,7 @@ package com.example.myapplication.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,6 +48,16 @@ fun EditorScreen(
 ) {
     val content by viewModel.content
     val isWordWrapEnabled by settingsViewModel.isWordWrapEnabled.collectAsState()
+    val fontSize by settingsViewModel.fontSize.collectAsState()
+    val fontFamilyName by settingsViewModel.fontFamily.collectAsState()
+    
+    val editorFontFamily = when (fontFamilyName) {
+        "Monospace" -> FontFamily.Monospace
+        "Sans Serif" -> FontFamily.SansSerif
+        "Serif" -> FontFamily.Serif
+        else -> FontFamily.Monospace
+    }
+    
     val showSearchReplace by viewModel.showSearchReplace.collectAsState()
     val isReplaceMode by viewModel.isReplaceMode.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -279,21 +290,28 @@ fun EditorScreen(
                     MarkdownPreview(content.text)
                 } else {
                     Row(modifier = Modifier.fillMaxSize()) {
-                        LineNumbers(content.text.lines().size)
+                        LineNumbers(content.text.lines().size, fontSize, editorFontFamily)
                         
                         BasicTextField(
-                            value = content,
-                            onValueChange = { viewModel.onContentChange(it) },
+                            content,
+                            { viewModel.onContentChange(it) },
                             readOnly = isLocked,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(12.dp)
-                                .then(if (isWordWrapEnabled) Modifier else Modifier.verticalScroll(rememberScrollState())),
+                                .then(
+                                    if (isWordWrapEnabled) {
+                                        Modifier.verticalScroll(rememberScrollState())
+                                    } else {
+                                        Modifier.horizontalScroll(rememberScrollState())
+                                            .verticalScroll(rememberScrollState())
+                                    }
+                                ),
                             textStyle = TextStyle(
                                 color = MaterialTheme.colorScheme.onBackground,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 14.sp,
-                                lineHeight = 20.sp
+                                fontFamily = editorFontFamily,
+                                fontSize = fontSize.sp,
+                                lineHeight = (fontSize * 1.5).sp
                             ),
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             visualTransformation = { text ->
@@ -549,11 +567,11 @@ fun EditorToolbar(
 }
 
 @Composable
-fun LineNumbers(lineCount: Int) {
+fun LineNumbers(lineCount: Int, fontSize: Int = 12, fontFamily: FontFamily = FontFamily.Monospace) {
     Column(
         modifier = Modifier
             .fillMaxHeight()
-            .width(32.dp)
+            .width((fontSize * 2.5).dp)
             .padding(top = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -562,10 +580,10 @@ fun LineNumbers(lineCount: Int) {
                 text = i.toString(),
                 style = TextStyle(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp
+                    fontFamily = fontFamily,
+                    fontSize = (fontSize * 0.8).sp
                 ),
-                modifier = Modifier.height(20.dp)
+                modifier = Modifier.height((fontSize * 1.5).dp)
             )
         }
     }

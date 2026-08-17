@@ -16,7 +16,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _fontSize = MutableStateFlow(sharedPreferences.getInt("font_size", 14))
     val fontSize: StateFlow<Int> = _fontSize.asStateFlow()
 
-    private val _fontFamily = MutableStateFlow(sharedPreferences.getString("font_family", "JetBrains Mono") ?: "JetBrains Mono")
+    private val _fontFamily = MutableStateFlow(sharedPreferences.getString("font_family", "Monospace") ?: "Monospace")
     val fontFamily: StateFlow<String> = _fontFamily.asStateFlow()
 
     private val _isWordWrapEnabled = MutableStateFlow(sharedPreferences.getBoolean("word_wrap", true))
